@@ -6,6 +6,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import Control.Concurrent(ThreadId, forkIO, killThread)
 import GypsFulvus.PluginStuff
+import Control.Monad(liftM)
 data Placeholder = Placeholder
 data CommandMap = CommandMap (M.Map T.Text Placeholder)
 data CommandWorkspace = CommandWorkspace Placeholder
@@ -36,15 +37,16 @@ execMain :: IO ()
 execMain = do
   collectorChannel <- atomically newTChan -- normal channel for dumping any user input
   consumerBroadcastChannel <- atomically newBroadcastTChan
-  loadCommsPlugins collectorChannel
-  availableCommandMap <- atomically $ newTMVar CommandMap
-  loadLabourPlugins availableCommandMap
-  sharedCommandWorkspace <- atomically $ newTMVar CommandWorkspace
-  sharedTaskQueue <- atomically $ newTChan
-  dispatchTID <- forkIO $ dispatchCommands sharedCommandWorkspace sharedTaskQueue
-  broadcastTID <- forkIO $ broadcastToConsumers consumerBroadcastChannel sharedCommandWorkspace sharedTaskQueue
-  collectorTID <- forkIO $ collectInputs collectorChannel availableCommandMap sharedCommandWorkspace sharedTaskQueue
-  
   canary <- atomically $ newTMVar False -- simple 'should I exit' canary
+  forkIO $ loadCommsPlugins canary collectorChannel
+--  availableCommandMap <- atomically $ newTMVar CommandMap
+--  loadLabourPlugins availableCommandMap
+--  sharedCommandWorkspace <- atomically $ newTMVar CommandWorkspace
+--  sharedTaskQueue <- atomically $ newTChan
+--  dispatchTID <- forkIO $ dispatchCommands sharedCommandWorkspace sharedTaskQueue
+--  broadcastTID <- forkIO $ broadcastToConsumers consumerBroadcastChannel sharedCommandWorkspace sharedTaskQueue
+--  collectorTID <- forkIO $ collectInputs collectorChannel availableCommandMap sharedCommandWorkspace sharedTaskQueue
+--  myTIDs = [dispatchTID,broadcastTID,collectorTID] 
+  let myTIDs  = []
   runForever canary
-  mapM_ killThread [dispatchTID, broadcastTID, collectorTID]
+  mapM_ killThread myTIDs

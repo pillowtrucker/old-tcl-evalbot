@@ -50,3 +50,6 @@ Thumbs.db
 
 #hs
 .stack*
+
+# fuck you, cabal, fuck you
+dist-newstyle
