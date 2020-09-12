@@ -4,7 +4,7 @@ import Control.Concurrent.STM.TMVar
 import Control.Concurrent.STM.TChan
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Control.Concurrent(ThreadId, forkIO)
+import Control.Concurrent(ThreadId, forkIO, killThread)
 data Placeholder = Placeholder
 data CommandMap = CommandMap (M.Map T.Text Placeholder)
 data CommandWorkspace = CommandWorkspace Placeholder
@@ -25,8 +25,8 @@ runForever :: TMVar Bool -> IO ()
 runForever diediedie =
   let block = do
         canaryDead <- readTMVar diediedie
-        if (canaryDead == True) then
-          return True
+        if (canaryDead) then
+          return canaryDead
         else
           retry
   in atomically block >>= \isDone ->
@@ -49,5 +49,5 @@ main = do
   collectorTID <- forkIO $ collectInputs collectorChannel availableCommandMap sharedCommandWorkspace sharedTaskQueue
   
   canary <- atomically $ newTMVar False -- simple 'should I exit' canary
-  
   runForever canary
+  mapM_ killThread [dispatchTID, broadcastTID, collectorTID]
