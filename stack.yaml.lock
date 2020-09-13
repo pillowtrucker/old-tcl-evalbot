@@ -5,15 +5,22 @@
 
 packages:
 - completed:
-    hackage: plugins-1.6.0@sha256:5eb50363b5f7a5539d91db5ce245adc2fd5bec634c58ad8c9498fcfd1c183d69,2531
+    cabal-file:
+      size: 2531
+      sha256: 5eb50363b5f7a5539d91db5ce245adc2fd5bec634c58ad8c9498fcfd1c183d69
+    name: plugins
+    version: 1.6.0
+    git: git@github.com:v-e-h/plugins.git
     pantry-tree:
-      size: 1526
-      sha256: 2805b6d574a4603833a17ce18974f7fbbdafba3db281dd3400422e3a36cb5762
+      size: 34501
+      sha256: bcd754b80924fc9c852557ea2a79947eab426e7fc6ef07ae82bccac9e7c4ab91
+    commit: e175d3c2ea9a8cc08126d37d9e30a327d8dc8b29
   original:
-    hackage: plugins-1.6.0
+    git: git@github.com:v-e-h/plugins.git
+    commit: e175d3c2ea9a8cc08126d37d9e30a327d8dc8b29
 snapshots:
 - completed:
-    size: 524996
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/27.yaml
-    sha256: 7ea31a280c56bf36ff591a7397cc384d0dff622e7f9e4225b47d8980f019a0f0
-  original: lts-14.27
+    size: 532381
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/13.yaml
+    sha256: 6ee17f7996e5bc75ae4406250841f1362ad4196418a4d90a0615ff4f26ac98df
+  original: lts-16.13

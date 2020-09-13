@@ -6,8 +6,8 @@ import Data.Maybe
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMVar
 
-pluginPath :: IO FilePath
-pluginPath = getXdgDirectory XdgData "gypsfulvus/plugins" >>= makeAbsolute
+srcPluginPath :: IO FilePath
+srcPluginPath = getXdgDirectory XdgData "gypsfulvus/src_plugins" >>= makeAbsolute
 
 
 configPath :: IO FilePath
@@ -21,11 +21,11 @@ configPath = getXdgDirectory XdgConfig "gypsfulvus"
 
 
 loadCommsPlugins canary collectorChannel =
-  let potentialPlugins = pluginPath >>= \pp -> listDirectory pp >>= filterM (\fuku -> doesDirectoryExist (pp ++ "/" ++ fuku)) >>= mapM (\fuku -> return (pp ++ "/" ++ fuku))
+  let potentialPlugins = srcPluginPath >>= \pp -> listDirectory pp >>= filterM (\fuku -> doesDirectoryExist (pp ++ "/" ++ fuku)) >>= mapM (\fuku -> return (pp ++ "/" ++ fuku))
   in do
-    pluginPath >>= putStrLn
-    pluginPath >>= listDirectory >>= mapM putStrLn
-    pluginPath >>= \pp -> listDirectory pp >>= filterM (\fuku -> putStrLn (pp ++ "/" ++ fuku) >> doesDirectoryExist (pp ++ "/" ++ fuku)) 
+    srcPluginPath >>= putStrLn
+    srcPluginPath >>= listDirectory >>= mapM putStrLn
+    srcPluginPath >>= \pp -> listDirectory pp >>= filterM (\fuku -> putStrLn (pp ++ "/" ++ fuku) >> doesDirectoryExist (pp ++ "/" ++ fuku)) 
     pp <- potentialPlugins
     mapM_ putStrLn pp
     ff <- mapM (\d -> findFile [d] "Plugin.hs") pp
