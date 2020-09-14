@@ -1,4 +1,4 @@
-module GypsFulvus.PluginStuff(loadCommsPlugins, Sewage, Manhole) where
+module GypsFulvus.PluginStuff(loadCommsPlugins, Sewage, Manhole, InitStatus) where
 import Control.Monad
 import System.Directory
 import System.Plugins.Make
@@ -13,7 +13,7 @@ data Sewage = Sewage {
 data Manhole = Manhole {
                        getInputChan :: TChan Sewage,
                        getOutputChan :: TChan Sewage}
-
+data InitStatus = GoodInitStatus | BadInitStatus T.Text
 srcPluginPath :: IO FilePath
 srcPluginPath = getXdgDirectory XdgData "gypsfulvus/srcplugins" >>= makeAbsolute
 
