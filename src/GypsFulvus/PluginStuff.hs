@@ -1,4 +1,4 @@
-module GypsFulvus.PluginStuff(loadCommsPlugins, Sewage, Manhole, InitStatus(..)) where
+module GypsFulvus.PluginStuff(loadCommsPlugins, Sewage(..), Manhole(..), InitStatus(..)) where
 import Control.Monad
 import System.Directory
 import System.Plugins.Make
