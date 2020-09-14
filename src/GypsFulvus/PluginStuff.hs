@@ -1,13 +1,21 @@
-module GypsFulvus.PluginStuff(loadCommsPlugins) where
+module GypsFulvus.PluginStuff(loadCommsPlugins, Sewage, Manhole) where
 import Control.Monad
 import System.Directory
 import System.Plugins.Make
 import Data.Maybe
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMVar
+import qualified Data.Text as T
+data Sewage = Sewage {
+  getSewageAuthor :: T.Text,
+  getSewage :: T.Text
+              }
+data Manhole = Manhole {
+                       getInputChan :: TChan Sewage,
+                       getOutputChan :: TChan Sewage}
 
 srcPluginPath :: IO FilePath
-srcPluginPath = getXdgDirectory XdgData "gypsfulvus/src_plugins" >>= makeAbsolute
+srcPluginPath = getXdgDirectory XdgData "gypsfulvus/srcplugins" >>= makeAbsolute
 
 
 configPath :: IO FilePath
@@ -33,10 +41,7 @@ loadCommsPlugins canary collectorChannel =
     s <- mapM (\hng -> makeAll hng ["-v","-dynamic"]) rff
     mapM (\s' -> case s' of
                    MakeSuccess _ p -> putStrLn p
-                   MakeFailure e -> do
-                     putStrLn $ show e
-                     
-                     return ()) s
+                   MakeFailure e -> putStrLn $ show e) s
     _ <- atomically $ swapTMVar canary True
     -- I don't actually want to quit here but I don't like errors from STM heuristics when the canary is GCed
     
