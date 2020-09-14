@@ -1,4 +1,4 @@
-module GypsFulvus(execMain, Manhole, Sewage, Initstatus) where
+module GypsFulvus(execMain, Manhole, Sewage, InitStatus) where
 import Control.Concurrent.STM (atomically, retry)
 import Control.Concurrent.STM.TMVar
 import Control.Concurrent.STM.TChan
