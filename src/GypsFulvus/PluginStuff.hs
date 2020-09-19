@@ -54,7 +54,7 @@ makeNetworkIdentStyleAutor
 makeNetworkIdentStyleAutor n i h c = NetworkIdentStyleAutor n (IrcMask i h) c
 
 data Sewage = Sewage {
-  getSewageAutor :: T.Text,
+  getSewageAutor :: SewageAutorInfo,
   getSewage :: T.Text
               }
 data Manhole = Manhole {
