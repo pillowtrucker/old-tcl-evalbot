@@ -24,7 +24,8 @@ library
                        containers,
                        text,
                        plugins >= 1.6.0,
-                       directory
+                       directory,
+                       hashable
          ghc-options:
             -O2
             -threaded
@@ -38,7 +39,8 @@ executable GypsFulvus
                        containers,
                        text,
                        plugins >= 1.6.0,
-                       directory
+                       directory,
+                       hashable
          ghc-options:
             -O2
             -threaded

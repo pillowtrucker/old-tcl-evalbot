@@ -1,11 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-module GypsFulvus.PluginStuff(loadCommsPlugins, Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor) where
+module GypsFulvus.PluginStuff(Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, inspectManhole, regift, stripCommandPrefix') where
 import Control.Monad
-import System.Directory
+
 import System.Plugins.Make
 import Data.Maybe
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMVar
+import qualified Data.List as L
 import qualified Data.Text as T
 
 (♯) :: T.Text -> T.Text -> T.Text
@@ -13,7 +14,18 @@ a ♯ b = (T.append) a b
 
 tooTeToSt :: T.Text -> T.Text -> String
 tooTeToSt a b = tup $ a ♯ "@" ♯ b
-
+stripCommandPrefix
+  :: T.Text -> [T.Text] -> Either [Maybe T.Text] (Maybe T.Text)
+stripCommandPrefix c = uniqueHit . filter (/= Nothing) . map (\cs -> T.stripPrefix cs (c ♯ " "))
+  where
+    uniqueHit cs = if (L.length cs == (1 :: Int)) then Right $ head cs else Left cs
+stripCommandPrefix'
+  :: T.Text -> [T.Text] -> Manhole -> SewageAutorInfo -> IO (Maybe T.Text)
+stripCommandPrefix' c ccs m sig = case stripCommandPrefix c ccs of
+  Right c -> return c
+  Left cs -> do
+    sew <- regift (Sewage sig (if L.null cs then ("No such command: " ♯ c) else ("Found multiple matching commands: " ♯ ((L.foldr1 (\h ng  -> h ♯ ", " ♯ ng)) $ (map (fromMaybe "")) cs)))) m
+    return Nothing
 tp :: String -> T.Text
 tp = T.pack
 tup :: T.Text -> String
@@ -62,40 +74,7 @@ data Manhole = Manhole {
                        getOutputChan :: TChan Sewage}
 data InitStatus = GoodInitStatus | BadInitStatus T.Text
 
-srcPluginPath :: IO FilePath
-srcPluginPath = getXdgDirectory XdgData "gypsfulvus/srcplugins" >>= makeAbsolute
-
-
-configPath :: IO FilePath
-configPath = getXdgDirectory XdgConfig "gypsfulvus"
-
-
-
-
--- load all the plugins for IO (e.g. IRC, stdio, maybe matrix procol, telnet, whatever)
-
-
-
-loadCommsPlugins canary collectorChannel =
-  let potentialPlugins = srcPluginPath >>= \pp -> listDirectory pp >>= filterM (\fuku -> doesDirectoryExist (pp ++ "/" ++ fuku)) >>= mapM (\fuku -> return (pp ++ "/" ++ fuku))
-  in do
-    srcPluginPath >>= putStrLn
-    srcPluginPath >>= listDirectory >>= mapM putStrLn
-    srcPluginPath >>= \pp -> listDirectory pp >>= filterM (\fuku -> putStrLn (pp ++ "/" ++ fuku) >> doesDirectoryExist (pp ++ "/" ++ fuku)) 
-    pp <- potentialPlugins
-    mapM_ putStrLn pp
-    ff <- mapM (\d -> findFile [d] "Plugin.hs") pp
-    let rff = map (fromMaybe "") $ filter (/= Nothing) ff
-    s <- mapM (\hng -> makeAll hng ["-v","-dynamic"]) rff
-    mapM (\s' -> case s' of
-                   MakeSuccess _ p -> putStrLn p
-                   MakeFailure e -> putStrLn $ show e) s
-    _ <- atomically $ swapTMVar canary True
-    -- I don't actually want to quit here but I don't like errors from STM heuristics when the canary is GCed
-    
-    return ()
-
-        
--- load all the routines that the bot can run (e.g. run tcl code, calculator, youtube, etc.)
-loadLabourPlugins availableCommandMap = undefined
--- thread to pass any work to be done
+inspectManhole :: Manhole -> IO Sewage
+inspectManhole = atomically . readTChan . getInputChan
+regift :: Sewage -> Manhole -> IO ()
+regift g = atomically . (flip writeTChan g) . getOutputChan
