@@ -25,7 +25,8 @@ library
                        text,
                        plugins >= 1.6.0,
                        directory,
-                       hashable
+                       hashable,
+                       monad-parallel
          ghc-options:
             -O2
             -threaded
@@ -40,7 +41,8 @@ executable GypsFulvus
                        text,
                        plugins >= 1.6.0,
                        directory,
-                       hashable
+                       hashable,
+                       monad-parallel
          ghc-options:
             -O2
             -threaded

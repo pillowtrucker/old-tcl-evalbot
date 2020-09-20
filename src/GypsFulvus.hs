@@ -6,9 +6,11 @@ import System.Directory
 import qualified Data.Text as T
 import Control.Concurrent(ThreadId, forkIO, killThread)
 import GypsFulvus.PluginStuff
-import Control.Monad(liftM)
+import Control.Monad(liftM,filterM)
 import qualified Data.Map.Strict as M
 import Data.Hashable
+import qualified Control.Monad.Parallel as Par
+import System.Plugins.Load
 data Placeholder = Placeholder
 data CommandMap = CommandMap (M.Map T.Text Placeholder)
 data CommandWorkspace = CommandWorkspace Placeholder
@@ -28,12 +30,15 @@ configPath = getXdgDirectory XdgConfig "gypsfulvus"
 
 assCallbackWithManholeInSewer
   :: Hashable a1 =>
-     TMVar (M.Map Int a2 -> M.Map Int a2)
-     -> a1 -> a2 -> STM ()
+     TMVar (M.Map Int Manhole)
+     -> a1 -> Manhole -> STM ()
 assCallbackWithManholeInSewer sewer callback_name callback_manhole = do
   sewer_old <- takeTMVar sewer
   h_cname <- return $ hash callback_name
-  putTMVar sewer $ M.insert h_cname callback_manhole
+  putTMVar sewer $ M.insert h_cname callback_manhole sewer_old
+lookupManholeInSewer s p = do
+  s_l <- readTMVar s
+  return $ M.lookup (hash p) s_l
   
 dispatchCommands sharedCommandWorkspace sharedTaskQueue = undefined
 -- broadcast ouputs from routines to all (interested) parties
@@ -59,14 +64,35 @@ runForever diediedie =
       if (isDone) then putStrLn "Exiting cleanly." else error "I escaped my eternal prison somehow." -- it shouldn't be possible for the else to be reached unless something melts down
 registerComms = undefined
 
-loadIOBackends sewer = undefined
+loadIOBackends sewer = do
+  potentialPlugins <- binPluginPath >>= \pp -> listDirectory pp >>= \xs -> filterM (\sd -> doesDirectoryExist (pp ++ "/" ++ sd)) xs >>= \xs' -> return $ Par.mapM (\sd -> pp ++ "/" ++ sd) xs'
+  Par.mapM (\pp -> atomically $ tryRegisterIOPlugin sewer pp) potentialPlugins
+  return ()
+  
+
+makeInputManhole s p = do
+  coreManhole <- lookupManholeInSewer s "core"
+  case coreManhole of
+    Just cm -> do
+      coreInputChan <- return $ getInputChan cm
+      pluginInputChan <- newTChan
+      return $ Just $ Manhole pluginInputChan coreInputChan
+    Nothing -> return Nothing
+    
+tryRegisterIOPlugin s p = do
+  im <- makeInputManhole s p
+  case im of
+    Just im' -> do
+      assCallbackWithManholeInSewer s p im'
+      return GoodInitStatus
+    Nothing -> return $ BadInitStatus $ T.pack "Catastrophic failure - core ejected."
 loadCoreCommands = undefined
 
 execMain :: IO ()
 execMain = do
   collectorChannel <- atomically newTChan -- normal channel for dumping any user input, this is the output channel for all plugins
   dumperChannel <- atomically newTChan -- uh this doesnt make any sense, every dings needs to have its own channel
-
+  
   canary <- atomically $ newTMVar False -- simple 'should I exit' canary
   
 --  forkIO $ loadCommsPlugins canary collectorChannel
