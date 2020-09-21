@@ -31,6 +31,7 @@ library
             -O2
             -threaded
             -with-rtsopts=-N
+            -g
 
 executable GypsFulvus
          default-language:    Haskell2010
@@ -47,6 +48,7 @@ executable GypsFulvus
             -O2
             -threaded
             -with-rtsopts=-N
+            -g
          hs-source-dirs:      src
          other-modules: GypsFulvus, GypsFulvus.PluginStuff
          main-is:             Main.hs
