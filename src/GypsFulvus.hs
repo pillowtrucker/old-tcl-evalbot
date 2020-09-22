@@ -1,4 +1,5 @@
-module GypsFulvus(execMain, Manhole(..), Sewage(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, regift,stripCommandPrefix',inspectManhole) where
+{-# LANGUAGE OverloadedStrings #-}
+module GypsFulvus(execMain) where
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMVar
 import Control.Concurrent.STM.TChan
@@ -6,28 +7,27 @@ import System.Directory
 import qualified Data.Text as T
 import Control.Concurrent(ThreadId, forkIO, killThread)
 import GypsFulvus.PluginStuff
-import Control.Monad(liftM,filterM)
+import Control.Monad(liftM,filterM,forever)
 import Control.Monad.IO.Class
 import qualified Data.Map.Strict as M
 import Data.Hashable
 import qualified Control.Monad.Parallel as Par
 import System.Plugins.Load
+import qualified Carrion.Plugin.IO.STDIO as CPISTDIO
+import Prelude hiding ((++),putStrLn)
+import Data.Text.IO(putStrLn)
 data Placeholder = Placeholder
 data CommandMap = CommandMap (M.Map T.Text Placeholder)
 data CommandWorkspace = CommandWorkspace Placeholder
 data Sewer = Sewer {getSewerMap :: M.Map Int Manhole}
+a ++ b = T.append a b
 
 
-srcPluginPath :: IO FilePath
-srcPluginPath = getXdgDirectory XdgData "gypsfulvus/srcplugins" >>= makeAbsolute
-binPluginPath :: IO FilePath
-binPluginPath = getXdgDirectory XdgData "gypsfulvus/srcplugins" >>= makeAbsolute
-
-ioBinPluginPath :: IO FilePath
-ioBinPluginPath = getXdgDirectory XdgData "gypsfulvus/binplugins/io" >>= makeAbsolute
+sharedDataPath :: IO FilePath
+sharedDataPath = getXdgDirectory XdgData "gypsfulvus" >>= makeAbsolute
 
 configPath :: IO FilePath
-configPath = getXdgDirectory XdgConfig "gypsfulvus"
+configPath = getXdgDirectory XdgConfig "gypsfulvus" >>= makeAbsolute
 
 
 
@@ -41,7 +41,8 @@ assCallbackWithManholeInSewer sewer callback_name callback_manhole = do
   let newSewer =Sewer $ M.insert h_cname callback_manhole (getSewerMap sewer_old)
   putTMVar sewer $ newSewer
   return sewer
-  
+
+lookupManholeInSewer :: TMVar(Sewer) -> T.Text -> STM (Maybe Manhole)
 lookupManholeInSewer s p = do
   s_l <- readTMVar s
   return $ M.lookup (hash p) (getSewerMap s_l)
@@ -56,35 +57,28 @@ collectInputs collectorChannel availableCommandMap sharedCommandWorkspace shared
 -- load all the routines that the bot can run (e.g. run tcl code, calculator, youtube, etc.)
 loadLabourPlugins availableCommandMap = undefined
 -- thread to pass any work to be done
+corePlugName :: T.Text
+corePlugName = "core"
 
-
-runForever :: TMVar Bool -> IO ()
-runForever diediedie =
+runForever :: TMVar Sewer -> IO ()
+runForever s =
   let block = do
-        canaryDead <- readTMVar diediedie
-        if (canaryDead) then
-          return canaryDead
-        else
-          retry
-  in atomically block >>= \isDone ->
-      if (isDone) then putStrLn "Exiting cleanly." else error "I escaped my eternal prison somehow." -- it shouldn't be possible for the else to be reached unless something melts down
+                mh <- lookupManholeInSewer s corePlugName
+                case mh of
+                  Just mh' -> readTChan $ getInputChan mh'
+                  Nothing -> retry
+  in forever $ do
+       someGarbage <- atomically block
+       let theAutor = show $ getSewageAutor someGarbage
+       putStrLn $ (T.pack theAutor) ++ " sez:"
+       putStrLn $ getSewage someGarbage
 registerComms = undefined
 
 listDirectory' = listDirectory
-
-loadIOBackends :: TMVar (Sewer) -> IO ()
-loadIOBackends sewer = do
-  potentialPlugins <- do
-    pp <- ioBinPluginPath
-    xs <- listDirectory pp
-    xs' <- filterM (\sd -> doesDirectoryExist (pp ++ "/" ++ sd)) xs
-    Par.mapM (\sind -> return $ ((pp ++ "/" ++ sind), sind)) xs'
-  Par.mapM (\(pp,sd) -> tryRegisterIOPlugin sewer pp sd) potentialPlugins
-  return ()
   
 makeInputManhole :: TMVar(Sewer) -> String -> IO (Maybe Manhole)
 makeInputManhole s p = do
-  coreManhole <- atomically $ lookupManholeInSewer s "core"
+  coreManhole <- atomically $ lookupManholeInSewer s corePlugName
   case coreManhole of
     Just cm -> do
       coreInputChan <- return $ getInputChan cm
@@ -92,26 +86,26 @@ makeInputManhole s p = do
       return $ Just $ Manhole pluginInputChan coreInputChan
     Nothing -> return Nothing
 
-tryRegisterIOPlugin :: TMVar(Sewer) -> FilePath -> String -> IO InitStatus
-tryRegisterIOPlugin s pp pn = do
-  im <- makeInputManhole s pn
+tryRegisterIOPlugin :: TMVar(Sewer) -> IO InitStatus
+tryRegisterIOPlugin s = do
+  let plugName = "STDIO"
+  im <- makeInputManhole s plugName
   case im of
     Just im' -> do
---      let  initPluginLoad :: IO ( LoadStatus Module (Manhole -> IO InitStatus))
-      putStrLn $ pp ++ "/" ++ pn ++ ".o"
-      initPluginLoad <- load_ (pp ++ "/" ++ pn ++ ".o") ["/usr/lib","/usr","/home/pszczola/.stack","/home/pszczola/.stack/programs/x86_64-linux/ghc-tinfo6-8.8.4/lib/ghc-8.8.4/base-4.13.0.0","/home/pszczola/.stack/programs/x86_64-linux/ghc-tinfo6-8.8.4/lib/ghc-8.8.4/base-4.13.0.0","/home/pszczola/.stack/programs/x86_64-linux/ghc-tinfo6-8.8.4/lib/ghc-8.8.4/haskeline-0.7.5.0/","/home/pszczola/.stack/programs/x86_64-linux/ghc-tinfo6-8.8.4/lib/ghc-8.8.4/haskeline-0.7.5.0/libHShaskeline-0.7.5.0-ghc8.8.4.so","/home/pszczola/.stack/snapshots/x86_64-linux-tinfo6/edde100bf8de6cb65f105b56e08069dfa3348c9270d546adc9aa73e98e3c573a/8.8.4/lib/x86_64-linux-ghc-8.8.4/","/home/pszczola/.stack/snapshots/x86_64-linux-tinfo6/edde100bf8de6cb65f105b56e08069dfa3348c9270d546adc9aa73e98e3c573a/8.8.4/lib/x86_64-linux-ghc-8.8.4/lib/","/home/pszczola/.stack/snapshots/x86_64-linux-tinfo6/edde100bf8de6cb65f105b56e08069dfa3348c9270d546adc9aa73e98e3c573a/8.8.4/lib/x86_64-linux-ghc-8.8.4/haskeline-0.8.1.0-2IMMl1Qcetx8pSusZdUu4N/"] "initPlugin"
-      case initPluginLoad of
-        LoadSuccess m sym -> putStrLn "loaded symbol initPlugin for pn"
-        LoadFailure e -> mapM putStrLn e >> return ()
---      initPlugin <- initPluginLoad
-      atomically $ assCallbackWithManholeInSewer s pn im'
-      return GoodInitStatus
+      stdioModuleStatus <- CPISTDIO.initPlugin im'
+      case stdioModuleStatus of
+        GoodInitStatus -> do
+          atomically $ assCallbackWithManholeInSewer s plugName im'
+          return GoodInitStatus
+        BadInitStatus errs -> return $ BadInitStatus $ "couldn't load stdio plugin: " ++ errs
     Nothing -> return $ BadInitStatus $ T.pack "Catastrophic failure - core ejected."
 loadCoreCommands = undefined
 
 makeNewSewer coreManhole = do
+  let
+    plugName = "core"
   emptySewer <- atomically $ newTMVar $ Sewer M.empty
-  atomically $ assCallbackWithManholeInSewer (emptySewer) "core" coreManhole
+  atomically $ assCallbackWithManholeInSewer (emptySewer) corePlugName coreManhole
   
 
 execMain :: IO ()
@@ -119,7 +113,7 @@ execMain = do
   collectorChannel <- atomically newTChan -- normal channel for dumping any user input, this is the output channel for all plugins
   dumperChannel <- atomically newTChan -- uh this doesnt make any sense, every dings needs to have its own channel
   newSewer <- makeNewSewer $ Manhole collectorChannel dumperChannel
-  loadIOBackends newSewer
+  tryRegisterIOPlugin newSewer
   canary <- atomically $ newTMVar False -- simple 'should I exit' canary
   
 --  forkIO $ loadCommsPlugins canary collectorChannel
@@ -133,7 +127,7 @@ execMain = do
 --  collectorTID <- forkIO $ collectInputs collectorChannel availableCommandMap sharedCommandWorkspace sharedTaskQueue
 --  myTIDs = [dispatchTID,broadcastTID,collectorTID] 
   let myTIDs  = []
-  runForever canary
+  runForever newSewer
   mapM_ killThread myTIDs
 
 

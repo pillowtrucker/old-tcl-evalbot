@@ -37,6 +37,8 @@ packages:
 extra-deps:
   - git: git@github.com:v-e-h/plugins.git
     commit: e175d3c2ea9a8cc08126d37d9e30a327d8dc8b29
+  - haskeline-0.8.1.0
+
 # - acme-missiles-0.3
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a

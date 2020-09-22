@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 extra-source-files:  README.md
 
 library
-         exposed-modules: GypsFulvus
+         exposed-modules: GypsFulvus, Carrion.Plugin.IO.STDIO
          other-modules:   GypsFulvus.PluginStuff
          default-language:    Haskell2010
          hs-source-dirs:      src
@@ -33,6 +33,8 @@ library
             -threaded
             -with-rtsopts=-N
             -g
+            -keep-o-files
+            -keep-hi-files
 
 executable GypsFulvus
          default-language:    Haskell2010
@@ -51,6 +53,31 @@ executable GypsFulvus
             -threaded
             -with-rtsopts=-N
             -g
+            -keep-o-files
+            -keep-hi-files
          hs-source-dirs:      src
-         other-modules: GypsFulvus, GypsFulvus.PluginStuff
+         other-modules: GypsFulvus.PluginStuff,GypsFulvus, Carrion.Plugin.IO.STDIO
+         exposed-modules: GypsFulvus
          main-is:             Main.hs
+
+executable Test-Carrion-Plugin-IO-STDIO
+           hs-source-dirs: src
+           main-is: Test-STDIO-Haskeline.hs
+           other-modules: Carrion.Plugin.IO.STDIO, GypsFulvus.PluginStuff
+           build-depends:       base >= 4.7 && < 5,
+                                stm,
+                                text >= 1.2.4.0,
+                                unix,
+                                haskeline,
+                                plugins,
+                                directory,
+                                containers,
+                                hashable,
+                                monad-parallel
+           default-language:    Haskell2010
+--           ld-options: -static
+           ghc-options:
+            -O2
+            -threaded
+            -with-rtsopts=-N
+            -g

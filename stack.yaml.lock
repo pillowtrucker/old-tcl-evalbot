@@ -18,6 +18,13 @@ packages:
   original:
     git: git@github.com:v-e-h/plugins.git
     commit: e175d3c2ea9a8cc08126d37d9e30a327d8dc8b29
+- completed:
+    hackage: haskeline-0.8.1.0@sha256:6a6158c90b929ce7aa5331ff5e9819aa32c7df8f4a7ba324b3cc055ee96b48cb,5818
+    pantry-tree:
+      size: 2955
+      sha256: b80332551d20389637851299b618679a8435531bed1fed905195ae7163526999
+  original:
+    hackage: haskeline-0.8.1.0
 snapshots:
 - completed:
     size: 532381
