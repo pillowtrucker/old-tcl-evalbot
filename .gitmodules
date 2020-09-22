@@ -1,0 +1,12 @@
+[submodule "tclcurl-fa"]
+	path = tclcurl-fa
+	url = git@github.com:flightaware/tclcurl-fa.git
+[submodule "tclx"]
+	path = tclx
+	url = git@github.com:flightaware/tclx.git
+[submodule "tcllib"]
+	path = tcllib
+	url = git@github.com:tcltk/tcllib.git
+[submodule "state"]
+	path = state
+	url = git@bitbucket.org:hastur666/fountain-of-wisdom.git

@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 extra-source-files:  README.md
 
 library
-         exposed-modules: GypsFulvus, Carrion.Plugin.IO.STDIO
+         exposed-modules: GypsFulvus, Carrion.Plugin.IO.STDIO, Carrion.Plugin.TCL
          other-modules:   GypsFulvus.PluginStuff
          default-language:    Haskell2010
          hs-source-dirs:      src
@@ -27,14 +27,16 @@ library
                        directory,
                        hashable,
                        monad-parallel,
-                       haskeline
+                       haskeline,
+                       unix
+         extra-libraries:     tcl8.6
+         Includes:            /usr/include/tcl.h,
+                              src/tclstubswrapper/tclstubs.h
          ghc-options:
             -O2
             -threaded
             -with-rtsopts=-N
             -g
-            -keep-o-files
-            -keep-hi-files
 
 executable GypsFulvus
          default-language:    Haskell2010
@@ -53,11 +55,13 @@ executable GypsFulvus
             -threaded
             -with-rtsopts=-N
             -g
-            -keep-o-files
-            -keep-hi-files
          hs-source-dirs:      src
          other-modules: GypsFulvus.PluginStuff,GypsFulvus, Carrion.Plugin.IO.STDIO
          exposed-modules: GypsFulvus
+         extra-libraries:     tcl8.6
+         Includes:            /usr/include/tcl.h,
+                              src/tclstubswrapper/tclstubs.h
+
          main-is:             Main.hs
 
 executable Test-Carrion-Plugin-IO-STDIO
@@ -76,6 +80,31 @@ executable Test-Carrion-Plugin-IO-STDIO
                                 monad-parallel
            default-language:    Haskell2010
 --           ld-options: -static
+           ghc-options:
+            -O2
+            -threaded
+            -with-rtsopts=-N
+            -g
+
+executable Test-Carrion-Plugin-TCL
+           hs-source-dirs: src
+           main-is: Test-Carrion-TCL.hs
+           other-modules: Carrion.Plugin.TCL, GypsFulvus.PluginStuff
+           build-depends:       base >= 4.7 && < 5,
+                                stm,
+                                text >= 1.2.4.0,
+                                unix,
+                                plugins,
+                                haskeline,
+                                containers,
+                                directory,
+                                hashable,
+                                monad-parallel
+           default-language:    Haskell2010
+           extra-libraries:     tcl8.6
+           Includes:            /usr/include/tcl.h,
+                                src/tclstubswrapper/tclstubs.h
+           C-Sources:           src/tclstubswrapper/tclstubs.c
            ghc-options:
             -O2
             -threaded
