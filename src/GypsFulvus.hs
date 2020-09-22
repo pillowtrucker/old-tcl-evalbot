@@ -5,7 +5,7 @@ import Control.Concurrent.STM.TMVar
 import Control.Concurrent.STM.TChan
 import System.Directory
 import qualified Data.Text as T
-import Control.Concurrent(ThreadId, forkIO, killThread)
+import Control.Concurrent(ThreadId, forkIO, killThread, threadDelay)
 import GypsFulvus.PluginStuff
 import Control.Monad(liftM,filterM,forever)
 import Control.Monad.IO.Class
@@ -14,8 +14,10 @@ import Data.Hashable
 import qualified Control.Monad.Parallel as Par
 import System.Plugins.Load
 import qualified Carrion.Plugin.IO.STDIO as CPISTDIO
+import qualified Carrion.Plugin.TCL as TCLSIMP
 import Prelude hiding ((++),putStrLn)
 import Data.Text.IO(putStrLn)
+import Debug.Trace
 data Placeholder = Placeholder
 data CommandMap = CommandMap (M.Map T.Text Placeholder)
 data CommandWorkspace = CommandWorkspace Placeholder
@@ -45,7 +47,7 @@ assCallbackWithManholeInSewer sewer callback_name callback_manhole = do
 lookupManholeInSewer :: TMVar(Sewer) -> T.Text -> STM (Maybe Manhole)
 lookupManholeInSewer s p = do
   s_l <- readTMVar s
-  return $ M.lookup (hash p) (getSewerMap s_l)
+  return $ traceShow (hash p) $ M.lookup (hash p) (getSewerMap s_l)
   
 dispatchCommands sharedCommandWorkspace sharedTaskQueue = undefined
 -- broadcast ouputs from routines to all (interested) parties
@@ -70,14 +72,23 @@ runForever s =
   in forever $ do
        someGarbage <- atomically block
        let theAutor = show $ getSewageAutor someGarbage
+       let theSewage = getSewage someGarbage
        putStrLn $ (T.pack theAutor) ++ " sez:"
-       putStrLn $ getSewage someGarbage
+       putStrLn $ theSewage
+       threadDelay 1000000
+       if (theAutor == "local:STDIO haskeline@local" && ("tcl " `T.isPrefixOf` theSewage)) then sendToTCL s someGarbage else return ()
+sendToTCL sewer sewage = do
+  m <- atomically $ lookupManholeInSewer sewer "TCL-Simple"
+  case m of
+    Just m -> traceShow (getSewageAutor sewage,getSewage sewage) regift' sewage m
+    Nothing -> putStrLn "couldn't find TCL submodule"
+    
 registerComms = undefined
 
 listDirectory' = listDirectory
   
-makeInputManhole :: TMVar(Sewer) -> String -> IO (Maybe Manhole)
-makeInputManhole s p = do
+makeManhole :: TMVar(Sewer) -> T.Text -> IO (Maybe Manhole)
+makeManhole s p = do
   coreManhole <- atomically $ lookupManholeInSewer s corePlugName
   case coreManhole of
     Just cm -> do
@@ -86,10 +97,48 @@ makeInputManhole s p = do
       return $ Just $ Manhole pluginInputChan coreInputChan
     Nothing -> return Nothing
 
+makeManhole' :: TMVar(Sewer) -> T.Text -> IO (Maybe Manhole)
+makeManhole' s p = do
+  coreManhole <- atomically $ lookupManholeInSewer s corePlugName
+  case coreManhole of
+    Just cm -> do
+      coreInputChan <- return $ getInputChan cm
+      pluginInputChan <- atomically $ newTChan
+      return $ Just $ Manhole pluginInputChan coreInputChan
+    Nothing -> return Nothing
+
+
+tryRegisterPlugin :: TMVar(Sewer) -> T.Text -> (Manhole -> IO InitStatus) -> [T.Text] -> IO InitStatus
+tryRegisterPlugin s plugName initFunc tellCommandsFunc = do
+  im <- makeManhole s plugName
+  case im of
+    Just im' -> do
+      moduleInitStatus <- initFunc im'
+      case moduleInitStatus of
+        GoodInitStatus -> do
+          atomically $ assCallbackWithManholeInSewer s plugName im'
+          return GoodInitStatus
+        BadInitStatus errs -> return $ BadInitStatus $ "couldn't load the " ++ plugName ++ " plugin: " ++ errs
+    Nothing -> return $ BadInitStatus $ T.pack "Catastrophic failure - core ejected."
+
+tryRegisterTCLPlugin :: TMVar(Sewer) -> T.Text -> (Manhole -> IO InitStatus) -> [T.Text] -> IO InitStatus
+tryRegisterTCLPlugin s plugName initFunc tellCommandsFunc = do
+  im <- makeManhole' s plugName
+  case im of
+    Just im' -> do
+      moduleInitStatus <- initFunc im'
+      case moduleInitStatus of
+        GoodInitStatus -> do
+          atomically $ assCallbackWithManholeInSewer s plugName im'
+          return GoodInitStatus
+        BadInitStatus errs -> return $ BadInitStatus $ "couldn't load the " ++ plugName ++ " plugin: " ++ errs
+    Nothing -> return $ BadInitStatus $ T.pack "Catastrophic failure - core ejected."
+
+
 tryRegisterIOPlugin :: TMVar(Sewer) -> IO InitStatus
 tryRegisterIOPlugin s = do
   let plugName = "STDIO"
-  im <- makeInputManhole s plugName
+  im <- makeManhole s plugName
   case im of
     Just im' -> do
       stdioModuleStatus <- CPISTDIO.initPlugin im'
@@ -113,7 +162,8 @@ execMain = do
   collectorChannel <- atomically newTChan -- normal channel for dumping any user input, this is the output channel for all plugins
   dumperChannel <- atomically newTChan -- uh this doesnt make any sense, every dings needs to have its own channel
   newSewer <- makeNewSewer $ Manhole collectorChannel dumperChannel
-  tryRegisterIOPlugin newSewer
+  tryRegisterPlugin newSewer "STDIO" CPISTDIO.initPlugin CPISTDIO.tellCommands
+  tryRegisterTCLPlugin newSewer "TCL-Simple" TCLSIMP.initPlugin TCLSIMP.tellCommands
   canary <- atomically $ newTMVar False -- simple 'should I exit' canary
   
 --  forkIO $ loadCommsPlugins canary collectorChannel

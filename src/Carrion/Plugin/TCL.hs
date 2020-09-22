@@ -3,7 +3,7 @@
 module Carrion.Plugin.TCL
     ( initPlugin,
       processCommand,
-      testThing
+      tellCommands
     ) where
 import Control.Monad
 import Control.Concurrent(forkIO)
@@ -47,10 +47,14 @@ type Tcl_EvalEx_Sig = (Tcl_Interp_Ptr -> TclScriptString -> TclScriptStringByteL
 type Tcl_GetStringResult_Sig = (Tcl_Interp_Ptr -> IO CString)
 tu :: T.Text -> String
 tu = T.unpack
+tellCommands :: [T.Text]
 tellCommands = map T.pack ["tcl"]
 myPluginName = T.pack "TCL smeggdrop"
+tl :: T.Text
 tl = T.pack "local"
+mySignature :: SewageAutorInfo
 mySignature = GenericStyleAutor myPluginName tl tl
+stripCommandLocal :: T.Text -> Manhole -> IO (Maybe T.Text)
 stripCommandLocal c m = stripCommandPrefix' c tellCommands m mySignature
 fuckingSewageAutorToFuckingTCLCommandFormatFuckYouSamStephenson
   :: SewageAutorInfo -> String -> TCLCommand
@@ -122,7 +126,7 @@ testThing = do
   putStrLn $ show $ smeginitstatus
 --  fakeFromIRC "proc testo4444 args {return \"booboo\n\"}"
 
-dumpDebug = putStrLn
+dumpDebug _ = return ()
 
 initPlugin :: Manhole -> IO InitStatus
 initPlugin manhole = do
@@ -158,6 +162,9 @@ initPlugin manhole = do
     return GoodInitStatus
 
 
+
+
+processCommand :: TCLInterpreterWrapper -> Sewage -> IO T.Text
 processCommand wi s = do
   let tcl_EvalEx = getEvalEx wi
       tcl_GetStringResult = getGetStringResult wi
@@ -176,13 +183,17 @@ processCommand wi s = do
           0 -> tcl_GetStringResult interp >>= \rs -> if nullPtr == rs then dumpDebug ("Command: " ++ c ++" ; returned a null pointer result.") >> return "FAILED" else peekCString rs >>= \nrs -> dumpDebug ("Output of command: " ++ c ++ " ;" ++ nrs ++ ";") >> return nrs
           _ -> errorInfo >> tcl_GetStringResult interp >>= peekCString
       performFromIRC = doTheTCL $ "return [pub:tcl:perform \"" ++ sewNick ++ "\" \"" ++ sewMask ++ "\" {} \"" ++ sewChan ++ "\" {" ++ sewCmd ++ "}]"
-  performFromIRC
+  performFromIRC >>= return . T.pack
 
 rEPL wrappedtclinterp manhole =
   let inspectManhole = atomically . readTChan . getInputChan
       regift g = atomically . (flip writeTChan g) . getOutputChan in
   forever $ do
     newGift <- inspectManhole manhole
-    processedGift <- processCommand wrappedtclinterp newGift
-    regift (Sewage (GenericStyleAutor (T.pack "TCL Intepreter") (T.pack "local") (T.pack "local")) (T.pack processedGift)) manhole
-    return ()
+    strippedCmd <- stripCommandLocal (getSewage newGift) manhole
+    case strippedCmd of
+      Just cmdBodyStripped -> do
+        let giftStripped = Sewage (getSewageAutor newGift) cmdBodyStripped
+        processedGift <- processCommand wrappedtclinterp giftStripped
+        regift (Sewage (GenericStyleAutor (T.pack "TCL Intepreter") (T.pack "local") (T.pack "local")) processedGift) manhole
+      Nothing -> return ()

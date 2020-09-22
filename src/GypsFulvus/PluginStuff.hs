@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module GypsFulvus.PluginStuff(Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, inspectManhole, regift, stripCommandPrefix') where
+module GypsFulvus.PluginStuff(Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, inspectManhole, regift, stripCommandPrefix', regift') where
 import Control.Monad
 
 import System.Plugins.Make
@@ -78,3 +78,5 @@ inspectManhole :: Manhole -> IO Sewage
 inspectManhole = atomically . readTChan . getInputChan
 regift :: Sewage -> Manhole -> IO ()
 regift g = atomically . (flip writeTChan g) . getOutputChan
+regift' :: Sewage -> Manhole -> IO ()
+regift' g = atomically . (flip writeTChan g) . getInputChan

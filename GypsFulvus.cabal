@@ -32,6 +32,7 @@ library
          extra-libraries:     tcl8.6
          Includes:            /usr/include/tcl.h,
                               src/tclstubswrapper/tclstubs.h
+
          ghc-options:
             -O2
             -threaded
@@ -49,64 +50,69 @@ executable GypsFulvus
                        directory,
                        hashable,
                        monad-parallel,
-                       haskeline
+                       haskeline,
+                       unix
          ghc-options:
             -O2
             -threaded
             -with-rtsopts=-N
             -g
          hs-source-dirs:      src
-         other-modules: GypsFulvus.PluginStuff,GypsFulvus, Carrion.Plugin.IO.STDIO
+         other-modules: GypsFulvus.PluginStuff,GypsFulvus, Carrion.Plugin.IO.STDIO, Carrion.Plugin.TCL
          exposed-modules: GypsFulvus
          extra-libraries:     tcl8.6
          Includes:            /usr/include/tcl.h,
                               src/tclstubswrapper/tclstubs.h
-
+         C-Sources:           src/tclstubswrapper/tclstubs.c
          main-is:             Main.hs
 
-executable Test-Carrion-Plugin-IO-STDIO
-           hs-source-dirs: src
-           main-is: Test-STDIO-Haskeline.hs
-           other-modules: Carrion.Plugin.IO.STDIO, GypsFulvus.PluginStuff
-           build-depends:       base >= 4.7 && < 5,
-                                stm,
-                                text >= 1.2.4.0,
-                                unix,
-                                haskeline,
-                                plugins,
-                                directory,
-                                containers,
-                                hashable,
-                                monad-parallel
-           default-language:    Haskell2010
---           ld-options: -static
-           ghc-options:
-            -O2
-            -threaded
-            -with-rtsopts=-N
-            -g
+--executable Test-Carrion-Plugin-IO-STDIO
+--           hs-source-dirs: src
+--           main-is: Test-STDIO-Haskeline.hs
+--           other-modules: Carrion.Plugin.IO.STDIO, GypsFulvus.PluginStuff
+--           build-depends:       base >= 4.7 && < 5,
+--                                stm,
+--                                text >= 1.2.4.0,
+--                                unix,
+--                                haskeline,
+--                                plugins,
+--                                directory,
+--                                containers,
+--                                hashable,
+--                                monad-parallel
+--           default-language:    Haskell2010
+--           extra-libraries:     tcl8.6
+--           Includes:            /usr/include/tcl.h,
+--                                src/tclstubswrapper/tclstubs.h
+--           C-Sources:           src/tclstubswrapper/tclstubs.c
+----           ld-options: -static
+--           ghc-options:
+--            -O2
+--            -threaded
+--            -with-rtsopts=-N
+--            -g
 
-executable Test-Carrion-Plugin-TCL
-           hs-source-dirs: src
-           main-is: Test-Carrion-TCL.hs
-           other-modules: Carrion.Plugin.TCL, GypsFulvus.PluginStuff
-           build-depends:       base >= 4.7 && < 5,
-                                stm,
-                                text >= 1.2.4.0,
-                                unix,
-                                plugins,
-                                haskeline,
-                                containers,
-                                directory,
-                                hashable,
-                                monad-parallel
-           default-language:    Haskell2010
-           extra-libraries:     tcl8.6
-           Includes:            /usr/include/tcl.h,
-                                src/tclstubswrapper/tclstubs.h
-           C-Sources:           src/tclstubswrapper/tclstubs.c
-           ghc-options:
-            -O2
-            -threaded
-            -with-rtsopts=-N
-            -g
+--executable Test-Carrion-Plugin-TCL
+--           hs-source-dirs: src
+--           main-is: Test-Carrion-TCL.hs
+--           other-modules: Carrion.Plugin.TCL, GypsFulvus.PluginStuff
+--           build-depends:       base >= 4.7 && < 5,
+--                                stm,
+--                                text >= 1.2.4.0,
+--                                unix,
+--                                plugins,
+--                                haskeline,
+--                                containers,
+--                                directory,
+--                                hashable,
+--                                monad-parallel
+--           default-language:    Haskell2010
+--           extra-libraries:     tcl8.6
+--           Includes:            /usr/include/tcl.h,
+--                                src/tclstubswrapper/tclstubs.h
+--           C-Sources:           src/tclstubswrapper/tclstubs.c
+--           ghc-options:
+--            -O2
+--            -threaded
+--            -with-rtsopts=-N
+--            -g
