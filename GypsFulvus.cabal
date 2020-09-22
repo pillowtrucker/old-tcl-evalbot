@@ -26,7 +26,8 @@ library
                        plugins >= 1.6.0,
                        directory,
                        hashable,
-                       monad-parallel
+                       monad-parallel,
+                       haskeline
          ghc-options:
             -O2
             -threaded
@@ -43,7 +44,8 @@ executable GypsFulvus
                        plugins >= 1.6.0,
                        directory,
                        hashable,
-                       monad-parallel
+                       monad-parallel,
+                       haskeline
          ghc-options:
             -O2
             -threaded
