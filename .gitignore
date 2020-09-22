@@ -53,3 +53,5 @@ Thumbs.db
 
 # fuck you, cabal, fuck you
 dist-newstyle
+*.o
+*.hi
