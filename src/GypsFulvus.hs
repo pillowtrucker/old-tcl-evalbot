@@ -47,7 +47,7 @@ assCallbackWithManholeInSewer sewer callback_name callback_manhole = do
 lookupManholeInSewer :: TMVar(Sewer) -> T.Text -> STM (Maybe Manhole)
 lookupManholeInSewer s p = do
   s_l <- readTMVar s
-  return $ traceShow (hash p) $ M.lookup (hash p) (getSewerMap s_l)
+  return $ M.lookup (hash p) (getSewerMap s_l)
   
 dispatchCommands sharedCommandWorkspace sharedTaskQueue = undefined
 -- broadcast ouputs from routines to all (interested) parties
@@ -73,14 +73,19 @@ runForever s =
        someGarbage <- atomically block
        let theAutor = show $ getSewageAutor someGarbage
        let theSewage = getSewage someGarbage
-       putStrLn $ (T.pack theAutor) ++ " sez:"
-       putStrLn $ theSewage
        threadDelay 1000000
-       if (theAutor == "local:STDIO haskeline@local" && ("tcl " `T.isPrefixOf` theSewage)) then sendToTCL s someGarbage else return ()
+       if (theAutor == "local:STDIO haskeline@local") then
+         if ("tcl " `T.isPrefixOf` theSewage) then
+           sendToTCL s someGarbage
+         else
+           return ()
+       else do
+         putStrLn $ T.pack theAutor ++ " sez:"
+         putStrLn theSewage
 sendToTCL sewer sewage = do
   m <- atomically $ lookupManholeInSewer sewer "TCL-Simple"
   case m of
-    Just m -> traceShow (getSewageAutor sewage,getSewage sewage) regift' sewage m
+    Just m -> regift' sewage m
     Nothing -> putStrLn "couldn't find TCL submodule"
     
 registerComms = undefined

@@ -135,9 +135,9 @@ method {inspect proc} proc {
       signal trap SIGALRM [list ::interpx::timeout $self $private_key]
       alarm [expr {[$self cget -timeout] / 1000.0}]
     }
-    
+    interp limit $interp time -seconds [clock add [clock seconds] 5 seconds]
     set code [catch {$interp eval $script} result]
-    
+    interp limit $interp time -seconds {}
     if $timeout {
       alarm 0
       if $timed_out {
@@ -329,7 +329,6 @@ method {inspect proc} proc {
     $self unset_internal_vars
     $self initialize_private_namespace
     
-    puts "initialize_interpreter inside interpx finished"
   }
   
   method unset_internal_vars {} {
@@ -344,7 +343,6 @@ method {inspect proc} proc {
     $interp alias ::interpx::timeout ::interpx::timeout
     $self expose {did touch var} ::interpx::touched_var
     
-    puts "finished initialize_private_namespace inside interpx"
   }
   
   method hide command {

@@ -163,13 +163,12 @@ proc pub:tcl:perform {nick mask hand channel line} {
 
   commands::configure nick mask hand channel line
   commands::increment_eval_count
-  
-  set author "$nick on $channel <$mask>"
 
+  set author "$nick on $channel <$mask>"
+  
   if [catch {$versioned_interpreter eval $line $author} output] {
     set output "error: $output"
   }
-
   putlog $output
   return $output
 }
