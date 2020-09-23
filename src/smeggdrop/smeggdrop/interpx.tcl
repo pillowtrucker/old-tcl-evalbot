@@ -14,7 +14,7 @@ snit::type interpx {
     option -onvarcreated
     option -onvarupdated
     option -onvardestroyed
-    option -timeout 6000
+    option -timeout 30000
   
   constructor args {
     set private_key [expr rand()]
@@ -135,7 +135,7 @@ method {inspect proc} proc {
       signal trap SIGALRM [list ::interpx::timeout $self $private_key]
       alarm [expr {[$self cget -timeout] / 1000.0}]
     }
-    interp limit $interp time -seconds [clock add [clock seconds] 5 seconds]
+    interp limit $interp time -seconds [clock add [clock seconds] 30 seconds]
     set code [catch {$interp eval $script} result]
     interp limit $interp time -seconds {}
     if $timeout {

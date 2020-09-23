@@ -13,7 +13,7 @@ snit::type versioned_interpreter {
   variable created_at
   
   option -verbose    -readonly true -default false
-  option -timeout    -readonly true -default 5000
+  option -timeout    -readonly true -default 30000
   option -logcommand -readonly true -default {puts stderr}
     
   constructor {path_to_state args} {
