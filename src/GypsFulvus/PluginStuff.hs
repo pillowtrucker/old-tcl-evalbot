@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
-module GypsFulvus.PluginStuff(Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, inspectManhole, regift, stripCommandPrefix', regift') where
+module GypsFulvus.PluginStuff(Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, inspectManhole, regift, stripCommandPrefix', regiftToWorker) where
 import Control.Monad
 
-import System.Plugins.Make
+
 import Data.Maybe
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMVar
@@ -14,11 +14,13 @@ a ♯ b = (T.append) a b
 
 tooTeToSt :: T.Text -> T.Text -> String
 tooTeToSt a b = tup $ a ♯ "@" ♯ b
+
 stripCommandPrefix
   :: T.Text -> [T.Text] -> Either [Maybe T.Text] (Maybe T.Text)
 stripCommandPrefix c = uniqueHit . filter (/= Nothing) . map (\cs -> T.stripPrefix cs (c ♯ " "))
   where
     uniqueHit cs = if (L.length cs == (1 :: Int)) then Right $ head cs else Left cs
+
 stripCommandPrefix'
   :: T.Text -> [T.Text] -> Manhole -> SewageAutorInfo -> IO (Maybe T.Text)
 stripCommandPrefix' c ccs m sig = case stripCommandPrefix c ccs of
@@ -26,10 +28,13 @@ stripCommandPrefix' c ccs m sig = case stripCommandPrefix c ccs of
   Left cs -> do
     sew <- regift (Sewage sig (if L.null cs then ("No such command: " ♯ c) else ("Found multiple matching commands: " ♯ ((L.foldr1 (\h ng  -> h ♯ ", " ♯ ng)) $ (map (fromMaybe "")) cs)))) m
     return Nothing
+
 tp :: String -> T.Text
 tp = T.pack
+
 tup :: T.Text -> String
 tup = T.unpack
+
 data IrcMask = IrcMask {
                        getIdent:: T.Text,
                        getHostname :: T.Text}
@@ -61,6 +66,7 @@ type Nickname = T.Text
 type NetworkIdent = T.Text
 type NetworkHostname = T.Text
 type NetworkChannel = T.Text
+
 makeNetworkIdentStyleAutor
   :: Nickname -> NetworkIdent -> NetworkHostname -> NetworkChannel -> SewageAutorInfo
 makeNetworkIdentStyleAutor n i h c = NetworkIdentStyleAutor n (IrcMask i h) c
@@ -76,7 +82,9 @@ data InitStatus = GoodInitStatus | BadInitStatus T.Text
 
 inspectManhole :: Manhole -> IO Sewage
 inspectManhole = atomically . readTChan . getInputChan
+
 regift :: Sewage -> Manhole -> IO ()
 regift g = atomically . (flip writeTChan g) . getOutputChan
-regift' :: Sewage -> Manhole -> IO ()
-regift' g = atomically . (flip writeTChan g) . getInputChan
+
+regiftToWorker :: Sewage -> Manhole -> IO ()
+regiftToWorker g = atomically . (flip writeTChan g) . getInputChan

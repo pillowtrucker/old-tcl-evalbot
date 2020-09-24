@@ -55,7 +55,7 @@ tu :: T.Text -> String
 tu = T.unpack
 tellCommands :: [T.Text]
 tellCommands = map T.pack ["tcl"]
-myPluginName = T.pack "TCL smeggdrop"
+myPluginName = T.pack "TCL-Simple"
 tl :: T.Text
 tl = T.pack "local"
 mySignature :: SewageAutorInfo
