@@ -321,6 +321,8 @@ method {inspect proc} proc {
     $self hide namespace
     $self hide trace
     $self hide vwait
+    $self hide apply
+    $self hide yield
     $self reimplement for
     $self reimplement foreach
     $self reimplement proc
