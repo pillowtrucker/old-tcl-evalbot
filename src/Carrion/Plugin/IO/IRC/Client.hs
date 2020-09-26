@@ -17,7 +17,7 @@ import Control.Lens
 import Control.Concurrent(threadDelay,forkIO)
 import qualified Data.Text as T
 import Control.Concurrent.STM
-import Control.Monad(liftM)
+import Control.Monad(liftM,forever)
 import Data.Monoid
 import qualified Data.Map as M
 import Data.ByteString(ByteString)
@@ -175,11 +175,22 @@ initPlugin mh = do
   }
 
       detectCommandHandler' = detectCommandHandler mh
-      conn = tlsConnection $ WithClientConfig myClientConfig
+      conn = (tlsConnection $ WithClientConfig myClientConfig) & flood .~ 0
   myNNS <- atomically $ newTMVar M.empty
   let namesReplyHandler' = namesReplyHandler mh myNNS
       rejoinOnKickHandler = fYourKickHandler myNNS
       mySpecialHandlers = [rejoinOnKickHandler,detectCommandHandler',joinHandler',namesReplyHandler',otherJoinHandler,otherPartHandler]
       cfg  = defaultInstanceConfig myNickname & channels %~ (myChannels ++) & handlers %~ (++ mySpecialHandlers)
-  forkIO $ runClient conn cfg ()
+  myIRCState <- newIRCState conn cfg ()
+  forkIO $ runClientWith myIRCState
+  forkIO $ acceptExternalComms myIRCState mh
   return GoodInitStatus
+
+acceptExternalComms myIRCState manhole =
+  let inspectManhole = atomically . readTChan . getInputChan
+      regift g = atomically . (flip writeTChan g) . getOutputChan in
+  forever $ do
+    newGift <- liftIO $ inspectManhole manhole
+    runIRCAction (mapM (\fff -> send $ Privmsg "#exquisitebot" $ Right fff) (nlSplit $ getSewage newGift)) myIRCState
+
+nlSplit = T.splitOn "\n"

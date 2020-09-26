@@ -68,7 +68,7 @@ lookupManholeInSewer s p = do
 
 corePlugName :: T.Text
 corePlugName = "core"
-
+mySignature = GenericStyleAutor corePlugName "local" "local"
 
 isIOPlugin :: Sewage -> TMVar IOPIDS -> IO Bool
 isIOPlugin sewage iopids = let pname = (hash . getName .nsAutorToGenericAutor . getSewageAutor $ sewage)
@@ -90,7 +90,11 @@ runForever s cmap iopids =
        amIIO <- isIOPlugin someGarbage iopids
        if (amIIO) then
          trySendToWorker s someGarbage cmap
-       else return ()
+       else do
+         pm <- atomically $ lookupManholeInSewer s "IRC-Simple"
+         case pm of
+           Just pm -> regiftToWorker someGarbage pm
+           Nothing -> return ()
        putStrLn $ T.pack theAutor ++ " sez:"
        putStrLn $ theSewage
 
