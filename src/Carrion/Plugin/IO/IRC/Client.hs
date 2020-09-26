@@ -23,6 +23,7 @@ import qualified Data.Map as M
 import Data.ByteString(ByteString)
 import Network.IRC.CTCP(CTCPByteString(..))
 import Control.Applicative ((<$>), (<|>))
+import Data.List(nub,(\\))
 type MyNicknames = M.Map (T.Text) ([T.Text])
 
 
@@ -45,26 +46,50 @@ myChannels = ["#exquisitebot"]
 rPL_NAMREPLY :: Int
 rPL_NAMREPLY = 353
 
+sendNAMES :: T.Text -> IRC s ()
+sendNAMES c = send $ RawMsg $ "NAMES " ♯ c
+
 joinHandler' :: EventHandler s
 joinHandler' = EventHandler (\ev -> matchNumeric 331 ev <|> matchNumeric 332 ev) $ \_ args -> case args of
   (c:_) -> do
-    send $ RawMsg $ "NAMES " ♯ c
+    sendNAMES c
   _ -> pure ()
 
-namesReplyHandler
-  :: a -> TMVar (M.Map T.Text [T.Text]) -> EventHandler s
-namesReplyHandler mh nns = huntAlligators (matchNumeric' rPL_NAMREPLY (mh,nns)) $ \src ((mh,nns), (meirl:theEqualsSignAsASeparateElementWhyTheFuckNot:theChan:theNicknames:[])) -> do
---     let fff =  (T.breakOn " :" (foldr1 (\a b -> a ♯ " *BOINK* " ♯ b) thetail))
---         (theChan,theNicknames) = fff & _2 %~ (T.splitOn " " . T.drop 1)
-     grr <- liftIO . atomically $ do
+replaceNNS
+  :: Ord k =>
+     TMVar (M.Map k [T.Text]) -> k -> T.Text -> STM (M.Map k [T.Text])
+replaceNNS nns theChan theNicknames= do
         lnns <- takeTMVar nns
         let curList = M.lookup theChan lnns
             fff = M.insert theChan (case curList of
                                  Nothing -> T.splitOn " " theNicknames
-                                 Just cl -> cl ++ (T.splitOn " " theNicknames)) lnns
+                                 Just cl -> nub (cl ++ (T.splitOn " " theNicknames))) lnns
+        putTMVar nns fff
         return fff
-     liftIO $ putStrLn $ "what the fuck did I just do: "  ++  show grr
-     return ()
+
+otherJoinHandler :: EventHandler s
+otherJoinHandler = huntAlligators (matchType _Join) $ \_ c -> sendNAMES c
+otherPartHandler :: EventHandler s
+otherPartHandler = huntAlligators (matchType _Part) $ \_ (c,_) -> sendNAMES c
+
+removeFromNNS
+  :: (Ord k, Eq a) =>
+     TMVar (M.Map k [a]) -> k -> a -> STM (M.Map k [a])
+removeFromNNS nns theChan theNick = do
+        lnns <- takeTMVar nns
+        let curList = M.lookup theChan lnns
+            fff = M.insert theChan (case curList of
+                                 Nothing -> []
+                                 Just cl -> nub (filter (/= theNick) cl)) lnns
+        putTMVar nns fff
+        return fff
+
+namesReplyHandler
+  :: a -> TMVar (M.Map T.Text [T.Text]) -> EventHandler s
+namesReplyHandler mh nns = huntAlligators (matchNumeric' rPL_NAMREPLY (mh,nns)) $
+  \src ((mh,nns), (meirl:theEqualsSignAsASeparateElementWhyTheFuckNot:theChan:theNicknames:[])) ->
+    (liftIO . atomically $ replaceNNS nns theChan theNicknames) >>= (liftIO . putStrLn . show)
+     
 
 matchNumeric'
   :: Int -> a1 -> Event a2 -> Maybe (a1, [a2])
@@ -72,12 +97,14 @@ matchNumeric' n intruder ev = case _message ev of
                          Numeric num args | n == num -> Just (intruder,args)
                          _ -> Nothing
 
-huntCrocodiles
+
+
+matchType'
   :: Getting (First b) (Message a1) b
      -> a2 -> Event a1 -> Maybe (a2, b)
-huntCrocodiles k mh ev = case preview k . _message $ ev of
+matchType' k intruder ev = case preview k . _message $ ev of
   Nothing -> Nothing
-  Just sth -> Just (mh,sth)
+  Just sth -> Just (intruder,sth)
 
 unimplementedCommand :: T.Text
 unimplementedCommand = "Command not implemented."
@@ -88,8 +115,8 @@ huntAlligators
      -> (Source T.Text -> b -> IRC s ()) -> EventHandler s
 huntAlligators mf cf = EventHandler mf cf
 
-fYourKickHandler :: Manhole -> EventHandler s
-fYourKickHandler mh = huntAlligators (huntCrocodiles _Kick mh) $ \src (mh, (channame, nickname, reason)) -> do
+
+fYourKickHandler nns = huntAlligators (matchType' _Kick nns) $ \src (nns, (channame, nickname, reason)) -> do
         tvarI <- get instanceConfig <$> getIRCState
         iGotBooted <- liftIO . atomically $ do
           theNick <- get nick <$> readTVar tvarI
@@ -99,16 +126,16 @@ fYourKickHandler mh = huntAlligators (huntCrocodiles _Kick mh) $ \src (mh, (chan
               | otherwise    -> False
             _ -> False
         if(iGotBooted) then do
-          liftIO $ regift (Sewage mySignature (T.pack "got kicked from " ♯ channame)) mh
+--          liftIO $ regift (Sewage mySignature (T.pack "got kicked from " ♯ channame)) mh
           liftIO (threadDelay 10000000)
           send $ Join channame
-        else return ()
+        else liftIO . atomically $ removeFromNNS nns nickname channame >> return ()
 
 spamCoordinator :: Manhole -> T.Text -> IO ()
 spamCoordinator mh msg = regift (Sewage mySignature msg) mh
 
 detectCommandHandler :: Manhole -> EventHandler s
-detectCommandHandler mh = huntAlligators (huntCrocodiles _Privmsg mh) $ \src (mh,(tgt,blergh)) -> do
+detectCommandHandler mh = huntAlligators (matchType' _Privmsg mh) $ \src (mh,(tgt,blergh)) -> do
               tvarI <- get instanceConfig <$> getIRCState
               case blergh of
                 Right body -> do
@@ -146,12 +173,13 @@ initPlugin mh = do
       }
     }
   }
-      rejoinOnKickHandler = fYourKickHandler mh
+
       detectCommandHandler' = detectCommandHandler mh
       conn = tlsConnection $ WithClientConfig myClientConfig
   myNNS <- atomically $ newTMVar M.empty
   let namesReplyHandler' = namesReplyHandler mh myNNS
-      mySpecialHandlers = [rejoinOnKickHandler,detectCommandHandler',joinHandler',namesReplyHandler']
+      rejoinOnKickHandler = fYourKickHandler myNNS
+      mySpecialHandlers = [rejoinOnKickHandler,detectCommandHandler',joinHandler',namesReplyHandler',otherJoinHandler,otherPartHandler]
       cfg  = defaultInstanceConfig myNickname & channels %~ (myChannels ++) & handlers %~ (++ mySpecialHandlers)
   forkIO $ runClient conn cfg ()
   return GoodInitStatus
