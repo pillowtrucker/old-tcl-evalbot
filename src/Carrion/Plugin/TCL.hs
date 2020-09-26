@@ -127,8 +127,8 @@ initPlugin manhole = do
 
 
 
-processCommand :: TCLInterpreterWrapper -> Sewage -> IO T.Text
-processCommand wi s = do
+processCommand :: TCLInterpreterWrapper -> Sewage -> Bool -> IO T.Text
+processCommand wi s ip = do
   let tcl_EvalEx = getEvalEx wi
       tcl_GetStringResult = getGetStringResult wi
       tcl_CancelEval = getCancelEval wi
@@ -150,6 +150,7 @@ processCommand wi s = do
           0 -> tcl_GetStringResult interp >>= \rs -> if nullPtr == rs then dumpDebug ("Command: " ++ c ++" ; returned a null pointer result.") >> return "FAILED" else peekCString rs >>= \nrs -> dumpDebug ("Output of command: " ++ c ++ " ;" ++ nrs ++ ";") >> return nrs
           _ -> errorInfo >> tcl_GetStringResult interp >>= peekCString
       performFromIRC = doTheTCL $ "pub:tcl:perform \"" ++ sewNick ++ "\" \"" ++ sewMask ++ "\" {} \"" ++ sewChan ++ "\" {" ++ sewCmd ++ "}"
+      performAdminLevel = doTheTCL sewCmd
 --  harvester <- forkIO $ do
 --    threadDelay 15000000
 --    putStrLn "cancelling thread!!!"
@@ -157,7 +158,7 @@ processCommand wi s = do
 --    putStrLn $ "cancel status " ++ (show fff)
 --    hngggg <- tcl_AsyncInvoke interp 0
 --    putStrLn $ "asyncinvoke returned " ++ (show hngggg)
-  res <- performFromIRC
+  res <- if (ip) then performAdminLevel else performFromIRC
 --  putStrLn "putting back the interp"
   atomically $ putTMVar i interp
   return $ T.pack res
@@ -174,7 +175,8 @@ rEPL wrappedtclinterp manhole =
         let hmm = gnarlyBalanced $ T.unpack cmdBodyStripped
         case hmm of
           Nothing -> do
-            processedGift <- processCommand wrappedtclinterp giftStripped
+            let isPrivileged = if T.pack "tclAdmin " `T.isPrefixOf` (getSewage newGift) then True else False
+            processedGift <- processCommand wrappedtclinterp giftStripped isPrivileged
             regift (Sewage mySignature processedGift) manhole
           Just berror -> regift (Sewage mySignature (T.pack berror)) manhole
       Nothing -> return ()

@@ -14,6 +14,7 @@ import Data.Hashable
 import qualified Control.Monad.Parallel as Par
 import qualified Carrion.Plugin.IO.STDIO as CPISTDIO
 import qualified Carrion.Plugin.TCL as TCLSIMP
+import qualified Carrion.Plugin.IO.IRC.Client as IRCSIMP
 import Prelude hiding ((++),putStrLn,putStr)
 import Data.Text.IO(putStrLn, putStr)
 import Debug.Trace
@@ -89,9 +90,9 @@ runForever s cmap iopids =
        amIIO <- isIOPlugin someGarbage iopids
        if (amIIO) then
          trySendToWorker s someGarbage cmap
-       else do
-         putStrLn $ T.pack theAutor ++ " sez:"
-         putStrLn $ theSewage
+       else return ()
+       putStrLn $ T.pack theAutor ++ " sez:"
+       putStrLn $ theSewage
 
 trySendToWorker
   :: TMVar Sewer -> Sewage -> TMVar CommandMap -> IO ()
@@ -151,6 +152,8 @@ stdioPlugName = "STDIO haskeline"
 
 tclPlugName :: T.Text
 tclPlugName = "TCL-Simple"
+ircPlugName :: T.Text
+ircPlugName = "IRC-Simple"
 
 execMain :: IO ()
 execMain = do
@@ -162,6 +165,9 @@ execMain = do
   tryRegisterPlugin newSewer stdioPlugName CPISTDIO.initPlugin CPISTDIO.tellCommands
   atomically $ registerCommands commandMap stdioPlugName CPISTDIO.tellCommands
   atomically $ regiop stdioPlugName iopids
+  tryRegisterPlugin newSewer ircPlugName IRCSIMP.initPlugin IRCSIMP.tellCommands
+  atomically $ registerCommands commandMap ircPlugName IRCSIMP.tellCommands
+  atomically $ regiop ircPlugName iopids
   tryRegisterPlugin newSewer tclPlugName TCLSIMP.initPlugin TCLSIMP.tellCommands
   atomically $ registerCommands commandMap tclPlugName TCLSIMP.tellCommands
   let myTIDs  = []
