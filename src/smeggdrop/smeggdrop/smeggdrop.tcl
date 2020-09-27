@@ -158,6 +158,8 @@ proc interp_eval script {
   $::versioned_interpreter interpx . eval $script
 }
 
+proc chanlist args { cache::get irc chanlist }
+
 proc pub:tcl:perform {nick mask hand channel line} {
   global versioned_interpreter
 

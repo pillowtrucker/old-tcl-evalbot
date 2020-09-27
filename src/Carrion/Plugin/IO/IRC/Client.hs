@@ -133,9 +133,10 @@ fYourKickHandler nns = huntAlligators (matchType' _Kick nns) $ \src (nns, (chann
 
 spamCoordinator :: Manhole -> T.Text -> IO ()
 spamCoordinator mh msg = regift (Sewage mySignature msg) mh
+spamFromIRC mh msg thenick thechan = regift (Sewage (GenericStyleAutor myPlugName "local" thechan) msg) mh
+stripDangerousNickname n = T.filter (\c -> (not . (c `elem`)) ['[',']','{','}'])
 
-detectCommandHandler :: Manhole -> EventHandler s
-detectCommandHandler mh = huntAlligators (matchType' _Privmsg mh) $ \src (mh,(tgt,blergh)) -> do
+detectCommandHandler (nns,mh) = huntAlligators (matchType' _Privmsg (nns,mh)) $ \src ((nns,mh),(tgt,blergh)) -> do
               tvarI <- get instanceConfig <$> getIRCState
               case blergh of
                 Right body -> do
@@ -146,8 +147,14 @@ detectCommandHandler mh = huntAlligators (matchType' _Privmsg mh) $ \src (mh,(tg
                     case mCommand of
                       Nothing -> return ()
                       Just c -> do
-                        
-                        liftIO $ spamCoordinator mh body -- actually process the commands here
+                        case src of
+                          Channel thechannelname thenickname -> do
+                            liftIO $ putStrLn $ "what the fuck: " ++ T.unpack thenickname ++ " " ++ T.unpack thechannelname
+                            lnns <- liftIO . atomically $ readTMVar nns
+                            let thenames = foldr1 (++) $ M.elems lnns -- fuck it all nicks
+                            liftIO $ spamCoordinator mh $ T.pack "tcl cache put irc chanlist [list " ♯ (foldr1 (\a b -> a ♯ " " ♯ b) $ (map (stripDangerousNickname $ T.pack)) $ thenames) ♯ "]"
+                            liftIO $ spamFromIRC mh body thenickname thechannelname -- actually process the commands here
+                          _ -> return () -- no secret commands fuck it
                   else return ()
                 Left _ -> return ()
 stripCommandLocal :: T.Text -> Manhole -> IO (Maybe T.Text)
@@ -173,14 +180,13 @@ initPlugin mh = do
       }
     }
   }
-
-      detectCommandHandler' = detectCommandHandler mh
       conn = (tlsConnection $ WithClientConfig myClientConfig) & flood .~ 0
   myNNS <- atomically $ newTMVar M.empty
   let namesReplyHandler' = namesReplyHandler mh myNNS
       rejoinOnKickHandler = fYourKickHandler myNNS
       mySpecialHandlers = [rejoinOnKickHandler,detectCommandHandler',joinHandler',namesReplyHandler',otherJoinHandler,otherPartHandler]
       cfg  = defaultInstanceConfig myNickname & channels %~ (myChannels ++) & handlers %~ (++ mySpecialHandlers)
+      detectCommandHandler' = detectCommandHandler (myNNS,mh)
   myIRCState <- newIRCState conn cfg ()
   forkIO $ runClientWith myIRCState
   forkIO $ acceptExternalComms myIRCState mh
@@ -191,6 +197,9 @@ acceptExternalComms myIRCState manhole =
       regift g = atomically . (flip writeTChan g) . getOutputChan in
   forever $ do
     newGift <- liftIO $ inspectManhole manhole
-    runIRCAction (mapM (\fff -> send $ Privmsg "#exquisitebot" $ Right fff) (nlSplit $ getSewage newGift)) myIRCState
+    putStrLn $ "trying to maybe send to " ++ (T.unpack .getChannel . genericAutorToNSAutor . getSewageAutor $ newGift)
+    runIRCAction (mapM (\fff -> send $ Privmsg (getChannel . genericAutorToNSAutor . getSewageAutor $ newGift) $ Right fff) (nlSplit $ getSewage newGift)) myIRCState
+
+
 
 nlSplit = T.splitOn "\n"

@@ -13,7 +13,7 @@ import System.Environment
 import Foreign.Ptr
 import Foreign.C.String
 import qualified Data.Text as T
-import GypsFulvus.PluginStuff(Manhole(..),Sewage(..), InitStatus(..),SewageAutorInfo(..),genericAutorToNSAutor, stripCommandPrefix', regift)
+import GypsFulvus.PluginStuff(Manhole(..),Sewage(..), InitStatus(..),SewageAutorInfo(..),genericAutorToNSAutor, stripCommandPrefix', regift, nsAutorToGenericAutor)
 data Tcl_Interp = Tcl_Interp deriving Show
 type Tcl_Interp_Ptr = Ptr Tcl_Interp
 type TCL_Actual_Version = CString
@@ -54,12 +54,14 @@ foreign import ccall "dynamic" mkTcl_EvalEx :: FunPtr (Tcl_Interp_Ptr -> TclScri
 tu :: T.Text -> String
 tu = T.unpack
 tellCommands :: [T.Text]
-tellCommands = map T.pack ["tcl"]
+tellCommands = map T.pack ["tcl","tclAdmin"]
+privilegedAutors = map T.pack ["core","STDIO haskeline","hastur","IRC-Simple"]
 myPluginName = T.pack "TCL-Simple"
 tl :: T.Text
 tl = T.pack "local"
 mySignature :: SewageAutorInfo
 mySignature = GenericStyleAutor myPluginName tl tl
+sigWithChan ch = GenericStyleAutor myPluginName tl ch
 stripCommandLocal :: T.Text -> Manhole -> IO (Maybe T.Text)
 stripCommandLocal c m = stripCommandPrefix' c tellCommands m mySignature
 fuckingSewageAutorToFuckingTCLCommandFormatFuckYouSamStephenson
@@ -175,9 +177,10 @@ rEPL wrappedtclinterp manhole =
         let hmm = gnarlyBalanced $ T.unpack cmdBodyStripped
         case hmm of
           Nothing -> do
-            let isPrivileged = if T.pack "tclAdmin " `T.isPrefixOf` (getSewage newGift) then True else False
+            let theOriginalChannel = getContext . nsAutorToGenericAutor . getSewageAutor $ newGift
+            let isPrivileged = if T.pack "tclAdmin " `T.isPrefixOf` (getSewage newGift) && ( getNick . genericAutorToNSAutor . getSewageAutor $ newGift) `elem` privilegedAutors then True else False
             processedGift <- processCommand wrappedtclinterp giftStripped isPrivileged
-            regift (Sewage mySignature processedGift) manhole
+            regift (Sewage (sigWithChan theOriginalChannel) processedGift) manhole
           Just berror -> regift (Sewage mySignature (T.pack berror)) manhole
       Nothing -> return ()
 

@@ -17,7 +17,7 @@ tooTeToSt a b = tup $ a ♯ "@" ♯ b
 
 stripCommandPrefix
   :: T.Text -> [T.Text] -> Either [Maybe T.Text] (Maybe T.Text)
-stripCommandPrefix c = uniqueHit . filter (/= Nothing) . map (\cs -> T.stripPrefix cs (c ♯ " "))
+stripCommandPrefix c = uniqueHit . filter (/= Nothing) . map (\cs -> T.stripPrefix (cs ♯ " ") (c ♯ " "))
   where
     uniqueHit cs = if (L.length cs == (1 :: Int)) then Right $ head cs else Left cs
 
