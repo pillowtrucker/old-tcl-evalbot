@@ -1,4 +1,4 @@
 [Server]
-hostname= "chat.freenode.org"
+hostname= chat.freenode.org
 port= 6697
-channels = "##politics"
+channels = ##politics !docking #noshower

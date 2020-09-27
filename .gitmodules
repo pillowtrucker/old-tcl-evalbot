@@ -1,12 +1,16 @@
 [submodule "tclcurl-fa"]
 	path = tclcurl-fa
-	url = git@github.com:flightaware/tclcurl-fa.git
+	url = https://github.com/flightaware/tclcurl-fa.git
 [submodule "tclx"]
 	path = tclx
-	url = git@github.com:flightaware/tclx.git
+	url = https://github.com/flightaware/tclx.git
 [submodule "tcllib"]
 	path = tcllib
-	url = git@github.com:tcltk/tcllib.git
+	url = https://github.com/tcltk/tcllib.git
 [submodule "state"]
 	path = state
 	url = git@bitbucket.org:hastur666/fountain-of-wisdom.git
+[submodule "tclcurl-fa/"]
+	url = https://github.com/flightaware/tclcurl-fa.git
+[submodule "tclx/"]
+	url = https://github.com/flightaware/tclx.git
