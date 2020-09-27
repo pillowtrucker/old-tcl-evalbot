@@ -12,7 +12,7 @@ import Network.TLS.Extra
 import Data.X509.Validation
 import Control.Monad.IO.Class   (MonadIO, liftIO)
 import Data.ByteString          (ByteString)
-import Data.Text.Encoding       (decodeUtf8)
+import Data.Text.Encoding       (decodeUtf8, encodeUtf8)
 import Control.Lens
 import Control.Concurrent(threadDelay,forkIO)
 import qualified Data.Text as T
@@ -21,9 +21,12 @@ import Control.Monad(liftM,forever)
 import Data.Monoid
 import qualified Data.Map as M
 import Data.ByteString(ByteString)
+import qualified Data.ByteString as BS
 import Network.IRC.CTCP(CTCPByteString(..))
 import Control.Applicative ((<$>), (<|>))
 import Data.List(nub,(\\))
+import Data.Ini
+import qualified Data.Text.IO as TIO
 type MyNicknames = M.Map (T.Text) ([T.Text])
 
 
@@ -39,8 +42,8 @@ tellCommands = ["tcl"]
 privateBotCommands = ["!join","!part","!kick","!op","!cycle","!reconnect","!ostracise","tcl"]
 myOwners = ["hastur"]
 
-myChannels :: [T.Text]
-myChannels = ["#exquisitebot"]
+--myChannels :: [T.Text]
+--myChannels = ["#exquisitebot"]
 
 -- this dogshit irc library doesnt seem to have a concept of 'people in the channel(s)'
 rPL_NAMREPLY :: Int
@@ -96,8 +99,6 @@ matchNumeric'
 matchNumeric' n intruder ev = case _message ev of
                          Numeric num args | n == num -> Just (intruder,args)
                          _ -> Nothing
-
-
 
 matchType'
   :: Getting (First b) (Message a1) b
@@ -159,19 +160,30 @@ detectCommandHandler (nns,mh) = huntAlligators (matchType' _Privmsg (nns,mh)) $ 
                 Left _ -> return ()
 stripCommandLocal :: T.Text -> Manhole -> IO (Maybe T.Text)
 stripCommandLocal c m = stripCommandPrefix' c tellCommands m mySignature
-        
+
+getIRCConfig = do
+  c <- TIO.readFile "./exquisiterobot.conf" >>= return . parseIni
+  case c of
+    Left _ -> return (T.pack "",0,T.pack "")
+    Right i -> do
+      let host = lookupValue "Server" "hostname" i
+          port = lookupValue "Server" "port" i
+          channels = lookupValue "Server" "channels" i
+      case (host,port,channels) of
+        (Right h, Right p, Right cs) -> return (h,(read . T.unpack $ p),cs)
+        _ -> return ("",0,"")
 initPlugin :: Manhole -> IO InitStatus
 initPlugin mh = do
-  let myHost = "darkarmy.chat"
-      myPort = 6697
-      myNickname = "ExquisiteRobot"
-      cpara = defaultParamsClient (unpack $ decodeUtf8 myHost) ""
+  (myHost,myPort,myChannels') <- getIRCConfig
+  let myChannels = T.splitOn " " myChannels'
+  let myNickname = "ExquisiteRobot"
+      cpara = defaultParamsClient (unpack myHost) ""
       validate cs vc sid cc = do
          -- First validate with the standard function
          res <- (onServerCertificate $ clientHooks cpara) cs vc sid cc
          -- Then strip out non-issues
          return $ filter (`notElem` [UnknownCA, SelfSigned]) res
-      myClientConfig = (tlsClientConfig myPort myHost) { tlsClientTLSSettings = TLSSettings cpara
+      myClientConfig = (tlsClientConfig myPort (encodeUtf8 myHost)) { tlsClientTLSSettings = TLSSettings cpara
     { clientHooks = (clientHooks cpara)
       { onServerCertificate = validate }
     , clientSupported = (clientSupported cpara)

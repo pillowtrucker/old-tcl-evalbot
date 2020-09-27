@@ -1,0 +1,4 @@
+[Server]
+hostname= "chat.freenode.org"
+port= 6697
+channels = "##politics"

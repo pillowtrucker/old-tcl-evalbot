@@ -55,3 +55,4 @@ Thumbs.db
 dist-newstyle
 *.o
 *.hi
+*.conf
