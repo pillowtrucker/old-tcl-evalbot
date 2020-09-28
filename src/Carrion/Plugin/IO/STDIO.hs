@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Carrion.Plugin.IO.STDIO
     ( initPlugin,
-      processCommand,
-      testThing,
       tellCommands,
+      myPlugName
     ) where
 import Control.Monad.IO.Class
 import Control.Monad
@@ -27,7 +26,8 @@ testThing = runInputT defaultSettings loop
                Just "quit" -> return ()
                Just input -> do outputStrLn $ T.unpack ("Input was: " ++ T.pack input)
                                 loop
-mySignature = GenericStyleAutor "STDIO haskeline" "local" "local"
+myPlugName = "STDIO haskeline"
+mySignature = GenericStyleAutor myPlugName myPlugName "local"
 tellCommands = [""]
 
 stripCommandLocal c m = stripCommandPrefix' c tellCommands m mySignature

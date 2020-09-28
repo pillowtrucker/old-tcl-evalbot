@@ -2,8 +2,8 @@
 
 module Carrion.Plugin.TCL
     ( initPlugin,
-      processCommand,
-      tellCommands
+      tellCommands,
+      myPlugName
     ) where
 import Control.Monad
 import Control.Concurrent(forkIO, threadDelay, killThread)
@@ -53,27 +53,34 @@ foreign import ccall "dynamic" mkTcl_EvalEx :: FunPtr (Tcl_Interp_Ptr -> TclScri
 
 tu :: T.Text -> String
 tu = T.unpack
+
 tellCommands :: [T.Text]
 tellCommands = map T.pack ["tcl","tclAdmin"]
+
+privilegedAutors :: [T.Text]
 privilegedAutors = map T.pack ["core","STDIO haskeline","hastur","IRC-Simple"]
+
+myPluginName :: T.Text
 myPluginName = T.pack "TCL-Simple"
-tl :: T.Text
-tl = T.pack "local"
+myPlugName = myPluginName
+lOCAL :: T.Text
+lOCAL = T.pack "local"
+
 mySignature :: SewageAutorInfo
-mySignature = GenericStyleAutor myPluginName tl tl
-sigWithChan ch = GenericStyleAutor myPluginName tl ch
+mySignature = GenericStyleAutor myPluginName myPluginName lOCAL
+
+sigWithChan :: T.Text -> SewageAutorInfo
+sigWithChan ch = GenericStyleAutor myPluginName myPluginName ch
+
 stripCommandLocal :: T.Text -> Manhole -> IO (Maybe T.Text)
 stripCommandLocal c m = stripCommandPrefix' c tellCommands m mySignature
-fuckingSewageAutorToFuckingTCLCommandFormatFuckYouSamStephenson
-  :: SewageAutorInfo -> String -> TCLCommand
-fuckingSewageAutorToFuckingTCLCommandFormatFuckYouSamStephenson b = case b of
-  GenericStyleAutor a b c -> fuckingSewageAutorToFuckingTCLCommandFormatFuckYouSamStephenson . genericAutorToNSAutor $ GenericStyleAutor a b c
-  NetworkIdentStyleAutor a b c -> TCLCommand (tu a) (show b) "" (tu c)
 
 
 mkTCLCommandFromAIAndMsg :: SewageAutorInfo -> String -> TCLCommand
-mkTCLCommandFromAIAndMsg = fuckingSewageAutorToFuckingTCLCommandFormatFuckYouSamStephenson
-
+mkTCLCommandFromAIAndMsg b = case b of
+  GenericStyleAutor a b c -> mkTCLCommandFromAIAndMsg . genericAutorToNSAutor $ GenericStyleAutor a b c
+  NetworkIdentStyleAutor a b c -> TCLCommand (tu a) (show b) "" (tu c)
+  
 data TCLInterpreterWrapper = TCLInterpreterWrapper {getInterp :: TMVar(Tcl_Interp_Ptr),
                                                     getEvalFile :: Tcl_EvalFile_Sig,
                                                     getEvalEx :: Tcl_EvalEx_Sig,
@@ -84,9 +91,11 @@ data TCLInterpreterWrapper = TCLInterpreterWrapper {getInterp :: TMVar(Tcl_Inter
 
 lEN_AUTO :: Int
 lEN_AUTO = -1
+
 eVAL_FLAGS_CLEAR :: Int
 eVAL_FLAGS_CLEAR = 0
 
+dumpDebug :: Monad m => p -> m ()
 dumpDebug _ = return ()
 
 initPlugin :: Manhole -> IO InitStatus
@@ -146,25 +155,20 @@ processCommand wi s ip = do
   let runscript s = tcl_EvalEx interp s lEN_AUTO eVAL_FLAGS_CLEAR
       runTclCommand s = newCString s >>= runscript
       errorInfo = runTclCommand "return $errorInfo"
-      
       doTheTCL c = runTclCommand c >>= \st ->
         case st of
           0 -> tcl_GetStringResult interp >>= \rs -> if nullPtr == rs then dumpDebug ("Command: " ++ c ++" ; returned a null pointer result.") >> return "FAILED" else peekCString rs >>= \nrs -> dumpDebug ("Output of command: " ++ c ++ " ;" ++ nrs ++ ";") >> return nrs
           _ -> errorInfo >> tcl_GetStringResult interp >>= peekCString
       performFromIRC = doTheTCL $ "pub:tcl:perform \"" ++ sewNick ++ "\" \"" ++ sewMask ++ "\" {} \"" ++ sewChan ++ "\" {" ++ sewCmd ++ "}"
       performAdminLevel = doTheTCL sewCmd
---  harvester <- forkIO $ do
---    threadDelay 15000000
---    putStrLn "cancelling thread!!!"
---    fff <- tcl_CancelEval interp nullPtr nullPtr 0x100000
---    putStrLn $ "cancel status " ++ (show fff)
---    hngggg <- tcl_AsyncInvoke interp 0
---    putStrLn $ "asyncinvoke returned " ++ (show hngggg)
   res <- if (ip) then performAdminLevel else performFromIRC
---  putStrLn "putting back the interp"
   atomically $ putTMVar i interp
   return $ T.pack res
 
+sigWithChan' :: T.Text -> T.Text -> SewageAutorInfo
+sigWithChan' thechannel originallocation = GenericStyleAutor originallocation myPluginName thechannel
+
+rEPL :: TCLInterpreterWrapper -> Manhole -> IO b
 rEPL wrappedtclinterp manhole =
   let inspectManhole = atomically . readTChan . getInputChan
       regift g = atomically . (flip writeTChan g) . getOutputChan in
@@ -178,16 +182,13 @@ rEPL wrappedtclinterp manhole =
         case hmm of
           Nothing -> do
             let theOriginalChannel = getContext . nsAutorToGenericAutor . getSewageAutor $ newGift
+                theOriginalPlugin = getLocation . nsAutorToGenericAutor . getSewageAutor $ newGift
             let isPrivileged = if T.pack "tclAdmin " `T.isPrefixOf` (getSewage newGift) && ( getNick . genericAutorToNSAutor . getSewageAutor $ newGift) `elem` privilegedAutors then True else False
             processedGift <- processCommand wrappedtclinterp giftStripped isPrivileged
-            regift (Sewage (sigWithChan theOriginalChannel) processedGift) manhole
+            regift (Sewage (sigWithChan' theOriginalChannel theOriginalPlugin) processedGift) manhole
           Just berror -> regift (Sewage mySignature (T.pack berror)) manhole
       Nothing -> return ()
 
--- stolen from the internet and adapted for tcl
--- Return whether a string contains balanced brackets.  Nothing indicates a
--- balanced string, while (Just i) means an imbalance was found at, or just
--- after, the i'th bracket.  We assume the string contains only brackets.
 isBalanced :: Char -> Char -> String -> Maybe String
 isBalanced openc closec = bal (-1) 0
   where
@@ -202,9 +203,12 @@ isBalanced openc closec = bal (-1) 0
           (sc:rs) -> if sc == openc || sc == closec then bal (i+2) n rs else bal (i+1) n rs 
       | otherwise = bal (i+1) n bs    
 
+gnarlyBalanced :: String -> Maybe String
 gnarlyBalanced = isBalanced '{' '}'
 -- it's better not to check for double quotes and square brackets I think since they can be escaped and not used internally for pub:tcl:perform...
 
+squareBalanced :: String -> Maybe String
 squareBalanced = isBalanced '[' ']'
 
+dquoteBalanced :: String -> Maybe String
 dquoteBalanced = isBalanced '"' '"'

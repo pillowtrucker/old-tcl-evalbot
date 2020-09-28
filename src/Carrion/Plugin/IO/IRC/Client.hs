@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Carrion.Plugin.IO.IRC.Client
-  (initPlugin,tellCommands)
+  (initPlugin,tellCommands,myPlugName)
 where
 import GypsFulvus.PluginStuff(Manhole(..),Sewage(..), InitStatus(..),SewageAutorInfo(..),genericAutorToNSAutor,inspectManhole,regift, stripCommandPrefix')
 import Network.IRC.Client
@@ -26,20 +26,33 @@ import Network.IRC.CTCP(CTCPByteString(..))
 import Control.Applicative ((<$>), (<|>))
 import Data.List(nub,(\\))
 import Data.Ini
+import Data.Maybe(fromMaybe)
 import qualified Data.Text.IO as TIO
 type MyNicknames = M.Map (T.Text) ([T.Text])
 
 
+(♯) :: T.Text -> T.Text -> T.Text
 a ♯ b = T.append a b
+
+unpack :: T.Text -> String
 unpack = T.unpack
+
 myPlugName :: T.Text
 myPlugName = T.pack "IRC-Simple"
+
 lOCAL :: T.Text 
 lOCAL = T.pack "local"
 
-mySignature = GenericStyleAutor myPlugName lOCAL lOCAL
+mySignature :: SewageAutorInfo
+mySignature = GenericStyleAutor myPlugName myPlugName lOCAL
+
+tellCommands :: [T.Text]
 tellCommands = ["tcl"]
+
+privateBotCommands :: [T.Text]
 privateBotCommands = ["!join","!part","!kick","!op","!cycle","!reconnect","!ostracise","tcl"]
+
+myOwners :: [[Char]]
 myOwners = ["hastur"]
 
 --myChannels :: [T.Text]
@@ -72,8 +85,26 @@ replaceNNS nns theChan theNicknames= do
 
 otherJoinHandler :: EventHandler s
 otherJoinHandler = huntAlligators (matchType _Join) $ \_ c -> sendNAMES c
-otherPartHandler :: EventHandler s
-otherPartHandler = huntAlligators (matchType _Part) $ \_ (c,_) -> sendNAMES c
+
+otherPartHandler
+  :: TMVar (M.Map (NickName T.Text) [ChannelName T.Text])
+     -> EventHandler s
+otherPartHandler nns = huntAlligators (matchType' _Part nns) $ \src (nns, (c,r)) -> do
+  case src of
+    Channel n c -> do
+      liftIO . atomically $ removeFromNNS nns c n
+      return ()
+    _ -> return ()
+
+otherQuitHandler
+  :: TMVar (M.Map (NickName T.Text) [ChannelName T.Text])
+     -> EventHandler s
+otherQuitHandler nns = huntAlligators (matchType' _Quit nns) $ \src (nns, r) -> do
+  case src of
+    Channel n c -> do
+      liftIO . atomically $ removeFromNNS nns c n
+      return ()
+    _ -> return ()
 
 removeFromNNS
   :: (Ord k, Eq a) =>
@@ -91,7 +122,7 @@ namesReplyHandler
   :: a -> TMVar (M.Map T.Text [T.Text]) -> EventHandler s
 namesReplyHandler mh nns = huntAlligators (matchNumeric' rPL_NAMREPLY (mh,nns)) $
   \src ((mh,nns), (meirl:theEqualsSignAsASeparateElementWhyTheFuckNot:theChan:theNicknames:[])) ->
-    (liftIO . atomically $ replaceNNS nns theChan theNicknames) >>= (liftIO . putStrLn . show)
+    (liftIO . atomically $ replaceNNS nns theChan theNicknames) >> return () -- >>= (liftIO . putStrLn . show)
      
 
 matchNumeric'
@@ -117,6 +148,7 @@ huntAlligators
 huntAlligators mf cf = EventHandler mf cf
 
 
+fYourKickHandler :: TMVar (M.Map T.Text [T.Text]) -> EventHandler s
 fYourKickHandler nns = huntAlligators (matchType' _Kick nns) $ \src (nns, (channame, nickname, reason)) -> do
         tvarI <- get instanceConfig <$> getIRCState
         iGotBooted <- liftIO . atomically $ do
@@ -134,9 +166,16 @@ fYourKickHandler nns = huntAlligators (matchType' _Kick nns) $ \src (nns, (chann
 
 spamCoordinator :: Manhole -> T.Text -> IO ()
 spamCoordinator mh msg = regift (Sewage mySignature msg) mh
-spamFromIRC mh msg thenick thechan = regift (Sewage (GenericStyleAutor myPlugName "local" thechan) msg) mh
+
+spamFromIRC :: Manhole -> T.Text -> T.Text -> T.Text -> IO ()
+spamFromIRC mh msg thenick thechan = regift (Sewage (GenericStyleAutor thenick myPlugName thechan) msg) mh
+
+stripDangerousNickname :: p -> T.Text -> T.Text
 stripDangerousNickname n = T.filter (\c -> (not . (c `elem`)) ['[',']','{','}'])
 
+detectCommandHandler
+  :: (TMVar (M.Map (ChannelName T.Text) [T.Text]), Manhole)
+     -> EventHandler s
 detectCommandHandler (nns,mh) = huntAlligators (matchType' _Privmsg (nns,mh)) $ \src ((nns,mh),(tgt,blergh)) -> do
               tvarI <- get instanceConfig <$> getIRCState
               case blergh of
@@ -150,68 +189,77 @@ detectCommandHandler (nns,mh) = huntAlligators (matchType' _Privmsg (nns,mh)) $ 
                       Just c -> do
                         case src of
                           Channel thechannelname thenickname -> do
-                            liftIO $ putStrLn $ "what the fuck: " ++ T.unpack thenickname ++ " " ++ T.unpack thechannelname
+--                            liftIO $ putStrLn $ "what the fuck: " ++ T.unpack thenickname ++ " " ++ T.unpack thechannelname
                             lnns <- liftIO . atomically $ readTMVar nns
-                            let thenames = foldr1 (++) $ M.elems lnns -- fuck it all nicks
+                            let thenames = (fromMaybe [T.pack ""]) $ M.lookup thechannelname lnns
                             liftIO $ spamCoordinator mh $ T.pack "tcl cache put irc chanlist [list " ♯ (foldr1 (\a b -> a ♯ " " ♯ b) $ (map (stripDangerousNickname $ T.pack)) $ thenames) ♯ "]"
                             liftIO $ spamFromIRC mh body thenickname thechannelname -- actually process the commands here
                           _ -> return () -- no secret commands fuck it
                   else return ()
                 Left _ -> return ()
+
 stripCommandLocal :: T.Text -> Manhole -> IO (Maybe T.Text)
 stripCommandLocal c m = stripCommandPrefix' c tellCommands m mySignature
 
+data IRCConfig = IRCConfig {getIRCHost:: T.Text, getIRCPort :: Int, getIRCChannels :: [T.Text], getIRCNickname :: T.Text} | FuckedIRCConfig T.Text
+
+getIRCConfig :: IO IRCConfig
 getIRCConfig = do
   c <- TIO.readFile "./exquisiterobot.conf" >>= return . parseIni
   case c of
-    Left _ -> return (T.pack "",0,T.pack "")
+    Left _ -> return $ FuckedIRCConfig "Couldn't read the configuration file."
     Right i -> do
       let host = lookupValue "Server" "hostname" i
           port = lookupValue "Server" "port" i
           channels = lookupValue "Server" "channels" i
-      case (host,port,channels) of
-        (Right h, Right p, Right cs) -> return (h,(read . T.unpack $ p),cs)
-        _ -> return ("",0,"")
+          myNickname = lookupValue "Server" "nickname" i
+      case (host,port,channels,myNickname) of
+        (Right h, Right p, Right cs, Right n) -> return $ IRCConfig h (read . T.unpack $ p) (T.splitOn " " cs) n
+        (h,p,cs,n) -> return $ FuckedIRCConfig $ foldr1 (♯) . map (T.pack . show) $ [h,p,cs,n]
+
 initPlugin :: Manhole -> IO InitStatus
 initPlugin mh = do
-  (myHost,myPort,myChannels') <- getIRCConfig
-  let myChannels = T.splitOn " " myChannels'
-  let myNickname = "ExquisiteRobot"
-      cpara = defaultParamsClient (unpack myHost) ""
-      validate cs vc sid cc = do
-         -- First validate with the standard function
-         res <- (onServerCertificate $ clientHooks cpara) cs vc sid cc
-         -- Then strip out non-issues
-         return $ filter (`notElem` [UnknownCA, SelfSigned]) res
-      myClientConfig = (tlsClientConfig myPort (encodeUtf8 myHost)) { tlsClientTLSSettings = TLSSettings cpara
-    { clientHooks = (clientHooks cpara)
-      { onServerCertificate = validate }
-    , clientSupported = (clientSupported cpara)
-      { supportedVersions = [TLS12, TLS11, TLS10]
-      , supportedCiphers = ciphersuite_strong
-      }
-    }
-  }
-      conn = (tlsConnection $ WithClientConfig myClientConfig) & flood .~ 0
-  myNNS <- atomically $ newTMVar M.empty
-  let namesReplyHandler' = namesReplyHandler mh myNNS
-      rejoinOnKickHandler = fYourKickHandler myNNS
-      mySpecialHandlers = [rejoinOnKickHandler,detectCommandHandler',joinHandler',namesReplyHandler',otherJoinHandler,otherPartHandler]
-      cfg  = defaultInstanceConfig myNickname & channels %~ (myChannels ++) & handlers %~ (++ mySpecialHandlers)
-      detectCommandHandler' = detectCommandHandler (myNNS,mh)
-  myIRCState <- newIRCState conn cfg ()
-  forkIO $ runClientWith myIRCState
-  forkIO $ acceptExternalComms myIRCState mh
-  return GoodInitStatus
-
+  ircConfig <- getIRCConfig
+  case ircConfig of
+    IRCConfig myHost myPort myChannels myNickname -> do
+      let cpara = defaultParamsClient (unpack myHost) ""
+          validate cs vc sid cc = do
+            -- First validate with the standard function
+            res <- (onServerCertificate $ clientHooks cpara) cs vc sid cc
+          -- Then strip out non-issues
+            return $ filter (`notElem` [UnknownCA, SelfSigned]) res
+          myClientConfig = (tlsClientConfig myPort (encodeUtf8 myHost)) { tlsClientTLSSettings = TLSSettings cpara
+                                                                          { clientHooks = (clientHooks cpara)
+                                                                            { onServerCertificate = validate }
+                                                                          , clientSupported = (clientSupported cpara)
+                                                                            { supportedVersions = [TLS12, TLS11, TLS10]
+                                                                            , supportedCiphers = ciphersuite_strong
+                                                                            }
+                                                                          }
+                                                                        }
+          conn = (tlsConnection $ WithClientConfig myClientConfig) & flood .~ 0
+      myNNS <- atomically $ newTMVar M.empty
+      let namesReplyHandler' = namesReplyHandler mh myNNS
+          rejoinOnKickHandler = fYourKickHandler myNNS
+          mySpecialHandlers = [rejoinOnKickHandler,detectCommandHandler',joinHandler',namesReplyHandler',otherJoinHandler,otherPartHandler myNNS, otherQuitHandler myNNS]
+          cfg  = defaultInstanceConfig myNickname & channels %~ (myChannels ++) & handlers %~ (++ mySpecialHandlers)
+          detectCommandHandler' = detectCommandHandler (myNNS,mh)
+      myIRCState <- newIRCState conn cfg ()
+      forkIO $ runClientWith myIRCState
+      forkIO $ acceptExternalComms myIRCState mh
+      return GoodInitStatus
+    FuckedIRCConfig err -> return $ BadInitStatus err
+    
+acceptExternalComms :: MonadIO f => IRCState s -> Manhole -> f b
 acceptExternalComms myIRCState manhole =
   let inspectManhole = atomically . readTChan . getInputChan
       regift g = atomically . (flip writeTChan g) . getOutputChan in
   forever $ do
     newGift <- liftIO $ inspectManhole manhole
-    putStrLn $ "trying to maybe send to " ++ (T.unpack .getChannel . genericAutorToNSAutor . getSewageAutor $ newGift)
+--    putStrLn $ "trying to maybe send to " ++ (T.unpack .getChannel . genericAutorToNSAutor . getSewageAutor $ newGift)
     runIRCAction (mapM (\fff -> send $ Privmsg (getChannel . genericAutorToNSAutor . getSewageAutor $ newGift) $ Right fff) (nlSplit $ getSewage newGift)) myIRCState
 
 
 
+nlSplit :: T.Text -> [T.Text]
 nlSplit = T.splitOn "\n"

@@ -2,3 +2,4 @@
 hostname= chat.freenode.org
 port= 6697
 channels = ##politics !docking #noshower
+nickname = ExquisiteTest

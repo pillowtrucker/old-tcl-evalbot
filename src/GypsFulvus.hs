@@ -68,12 +68,15 @@ lookupManholeInSewer s p = do
 
 corePlugName :: T.Text
 corePlugName = "core"
+
+mySignature :: SewageAutorInfo
 mySignature = GenericStyleAutor corePlugName "local" "local"
 
 isIOPlugin :: Sewage -> TMVar IOPIDS -> IO Bool
-isIOPlugin sewage iopids = let pname = (hash . getName .nsAutorToGenericAutor . getSewageAutor $ sewage)
+isIOPlugin sewage iopids = let pname = (hash . getLocation .nsAutorToGenericAutor . getSewageAutor $ sewage)
                     in do
   IOPIDS iop <- atomically $ readTMVar iopids
+
   return $ pname `elem` iop
 
 runForever :: TMVar Sewer -> TMVar(CommandMap) -> TMVar(IOPIDS) -> IO ()
@@ -91,7 +94,7 @@ runForever s cmap iopids =
        if (amIIO) then
          trySendToWorker s someGarbage cmap
        else do
-         pm <- atomically $ lookupManholeInSewer s "IRC-Simple"
+         pm <- atomically $ lookupManholeInSewer s (getName . nsAutorToGenericAutor . getSewageAutor $ someGarbage)
          case pm of
            Just pm -> regiftToWorker someGarbage pm
            Nothing -> return ()
@@ -125,24 +128,42 @@ makeManhole s p = do
     Nothing -> return Nothing
 
 
-tryRegisterPlugin :: TMVar(Sewer) -> T.Text -> (Manhole -> IO InitStatus) -> [T.Text] -> IO InitStatus
-tryRegisterPlugin s plugName initFunc tellCommandsFunc = do
-  im <- makeManhole s plugName
-  case im of
-    Just im' -> do
-      moduleInitStatus <- initFunc im'
-      case moduleInitStatus of
-        GoodInitStatus -> do
-          atomically $ assCallbackWithManholeInSewer s plugName im'
-          return GoodInitStatus
-        BadInitStatus errs -> return $ BadInitStatus $ "couldn't load the " ++ plugName ++ " plugin: " ++ errs
-    Nothing -> return $ BadInitStatus $ T.pack "Catastrophic failure - core ejected."
+
+registerPlugin_
+  :: TMVar Sewer
+     -> T.Text -> (Manhole -> IO InitStatus) -> IO InitStatus
+registerPlugin_ s plugName initFunc = do
+      im <- makeManhole s plugName
+      case im of
+        Just im' -> do
+          moduleInitStatus <- initFunc im'
+          case moduleInitStatus of
+            GoodInitStatus -> do
+              atomically $ assCallbackWithManholeInSewer s plugName im'
+              return GoodInitStatus
+            BadInitStatus errs -> return $ BadInitStatus $ "couldn't load the " ++ plugName ++ " plugin: " ++ errs
+        Nothing -> return $ BadInitStatus $ T.pack "Catastrophic failure - core ejected."
 
 
+tryRegisterPlugin
+  :: TMVar Sewer
+     -> TMVar IOPIDS -> TMVar CommandMap -> CarrionPlugin -> IO InitStatus
+tryRegisterPlugin s iopids commandMap plugin = do
+  let plugName = tellPlugName plugin
+  let initFunc = initPlugin plugin
+  let tellFunc = tellCommands plugin
+  theStatus <- registerPlugin_ s plugName initFunc
+  atomically $ registerCommands commandMap plugName tellFunc
+  case plugin of
+    InputPlugin initFunc tellFunc plugName -> do
+      atomically $ regiop plugName iopids
+      return ()
+    WorkerPlugin _ _ _ -> return ()
+  return theStatus
 makeNewSewer :: Manhole -> IO (TMVar Sewer)
 makeNewSewer coreManhole = do
   let
-    plugName = "core"
+    plugName = corePlugName
   emptySewer <- atomically $ newTMVar $ Sewer M.empty
   atomically $ assCallbackWithManholeInSewer (emptySewer) corePlugName coreManhole
 
@@ -156,24 +177,28 @@ stdioPlugName = "STDIO haskeline"
 
 tclPlugName :: T.Text
 tclPlugName = "TCL-Simple"
+
 ircPlugName :: T.Text
 ircPlugName = "IRC-Simple"
 
+statusBad s = case s of
+  GoodInitStatus -> False
+  BadInitStatus _ -> True
+
 execMain :: IO ()
 execMain = do
+  let cpstdio = InputPlugin CPISTDIO.initPlugin CPISTDIO.tellCommands CPISTDIO.myPlugName
+      ircsimp = InputPlugin IRCSIMP.initPlugin IRCSIMP.tellCommands IRCSIMP.myPlugName
+      tclsimp = WorkerPlugin TCLSIMP.initPlugin TCLSIMP.tellCommands TCLSIMP.myPlugName
+      myPlugins = [cpstdio,ircsimp,tclsimp]
   collectorChannel <- atomically newTChan -- normal channel for dumping any user input, this is the output channel for all plugins
   dumperChannel <- atomically newTChan -- uh this doesnt make any sense, every dings needs to have its own channel
   commandMap <- atomically $ newTMVar $ CommandMap M.empty
   iopids <- atomically $ newTMVar $ IOPIDS []
   newSewer <- makeNewSewer $ Manhole collectorChannel dumperChannel
-  tryRegisterPlugin newSewer stdioPlugName CPISTDIO.initPlugin CPISTDIO.tellCommands
-  atomically $ registerCommands commandMap stdioPlugName CPISTDIO.tellCommands
-  atomically $ regiop stdioPlugName iopids
-  tryRegisterPlugin newSewer ircPlugName IRCSIMP.initPlugin IRCSIMP.tellCommands
-  atomically $ registerCommands commandMap ircPlugName IRCSIMP.tellCommands
-  atomically $ regiop ircPlugName iopids
-  tryRegisterPlugin newSewer tclPlugName TCLSIMP.initPlugin TCLSIMP.tellCommands
-  atomically $ registerCommands commandMap tclPlugName TCLSIMP.tellCommands
+  initStatuses <- Par.mapM (tryRegisterPlugin newSewer iopids commandMap ) myPlugins
+  let badstatuses = filter (statusBad) initStatuses
+  if (not . null $ badstatuses) then mapM_ (putStrLn . T.pack . show) initStatuses >> error (T.unpack "Plugin load failed, see above.") else return ()
   let myTIDs  = []
   runForever newSewer commandMap iopids
   mapM_ killThread myTIDs

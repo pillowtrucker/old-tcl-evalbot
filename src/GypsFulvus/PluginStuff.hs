@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module GypsFulvus.PluginStuff(Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, inspectManhole, regift, stripCommandPrefix', regiftToWorker) where
+module GypsFulvus.PluginStuff(Sewage(..), Manhole(..), InitStatus(..), SewageAutorInfo(..), IrcMask(..), genericAutorToNSAutor, nsAutorToGenericAutor, inspectManhole, regift, stripCommandPrefix', regiftToWorker, Carrion(..),CarrionPlugin(..)) where
 import Control.Monad
 
 
@@ -78,7 +78,7 @@ data Sewage = Sewage {
 data Manhole = Manhole {
                        getInputChan :: TChan Sewage,
                        getOutputChan :: TChan Sewage}
-data InitStatus = GoodInitStatus | BadInitStatus T.Text
+data InitStatus = GoodInitStatus | BadInitStatus T.Text deriving Show
 
 inspectManhole :: Manhole -> IO Sewage
 inspectManhole = atomically . readTChan . getInputChan
@@ -88,3 +88,14 @@ regift g = atomically . (flip writeTChan g) . getOutputChan
 
 regiftToWorker :: Sewage -> Manhole -> IO ()
 regiftToWorker g = atomically . (flip writeTChan g) . getInputChan
+
+data CarrionPlugin = InputPlugin {getInitPlugin :: (Manhole -> IO InitStatus), getTellCommands :: [T.Text], getMyPlugName :: T.Text} | WorkerPlugin {getInitPlugin :: (Manhole -> IO InitStatus), getTellCommands :: [T.Text], getMyPlugName :: T.Text}
+
+class Carrion a where
+  initPlugin :: a -> Manhole -> IO InitStatus
+  tellCommands :: a -> [T.Text]
+  tellPlugName :: a -> T.Text
+instance Carrion CarrionPlugin where
+  initPlugin = getInitPlugin
+  tellCommands = getTellCommands
+  tellPlugName = getMyPlugName
