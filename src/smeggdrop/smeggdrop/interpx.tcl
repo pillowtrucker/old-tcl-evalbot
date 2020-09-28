@@ -209,7 +209,7 @@ method {inspect proc} proc {
   }
 
   method trace_command_for_var var {
-    list ::interpx::touched_var $private_key $var
+    #list ::interpx::touched_var $private_key $var
   }
 
   # callbacks
@@ -343,7 +343,7 @@ method {inspect proc} proc {
     $self . namespace eval ::interpx {}
     $interp alias ::interpx::noop expr 0
     $interp alias ::interpx::timeout ::interpx::timeout
-    $self expose {did touch var} ::interpx::touched_var
+      $self expose {did touch var} ::interpx::touched_var
     
   }
   
