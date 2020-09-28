@@ -26,7 +26,9 @@ stripCommandPrefix'
 stripCommandPrefix' c ccs m sig = case stripCommandPrefix c ccs of
   Right c -> return c
   Left cs -> do
-    sew <- regift (Sewage sig (if L.null cs then ("No such command: " ♯ c) else ("Found multiple matching commands: " ♯ ((L.foldr1 (\h ng  -> h ♯ ", " ♯ ng)) $ (map (fromMaybe "")) cs)))) m
+    sew <- do
+      putStrLn . show $ (Sewage sig (if L.null cs then ("No such command: " ♯ c) else ("Found multiple matching commands: " ♯ ((L.foldr1 (\h ng  -> h ♯ ", " ♯ ng)) $ (map (fromMaybe "")) cs))))
+      return Nothing
     return Nothing
 
 tp :: String -> T.Text
@@ -74,7 +76,7 @@ makeNetworkIdentStyleAutor n i h c = NetworkIdentStyleAutor n (IrcMask i h) c
 data Sewage = Sewage {
   getSewageAutor :: SewageAutorInfo,
   getSewage :: T.Text
-              }
+              } deriving Show
 data Manhole = Manhole {
                        getInputChan :: TChan Sewage,
                        getOutputChan :: TChan Sewage}
