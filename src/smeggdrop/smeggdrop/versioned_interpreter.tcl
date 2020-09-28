@@ -50,7 +50,7 @@ snit::type versioned_interpreter {
                      -onprocupdated    [list $self did update proc]  \
                      -onprocdestroyed  [list $self did destroy proc] \
                      -onvarcreated     [list $self did create var]   \
-                     -onvarupdated     [list $self did update var]   \
+                     -onvarupdated     [list $self did touch var]   \
                      -onvardestroyed   [list $self did destroy var]  \
                      -timeout          [$self cget -timeout]
                 ]
