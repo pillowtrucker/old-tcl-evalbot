@@ -257,7 +257,8 @@ acceptExternalComms myIRCState manhole =
   forever $ do
     newGift <- liftIO $ inspectManhole manhole
 --    putStrLn $ "trying to maybe send to " ++ (T.unpack .getChannel . genericAutorToNSAutor . getSewageAutor $ newGift)
-    runIRCAction (mapM (\fff -> send $ Privmsg (getChannel . genericAutorToNSAutor . getSewageAutor $ newGift) $ Right fff) (nlSplit $ getSewage newGift)) myIRCState
+    
+    runIRCAction (mapM (\fff -> send $ Privmsg (getChannel . genericAutorToNSAutor . getSewageAutor $ newGift) $ Right fff) (foldr1 (++) . map (T.chunksOf 255) . nlSplit $ getSewage newGift)) myIRCState
 
 
 
