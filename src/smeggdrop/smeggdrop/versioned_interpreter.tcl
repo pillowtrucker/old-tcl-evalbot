@@ -368,7 +368,7 @@ snit::type versioned_interpreter::index {
   }
   
   method get key {
-    set values($key)
+    if [catch {set values($key)} fuckyou] {$self put $key [sha1 $key]; return [sha1 $key]} {return $fuckyou}
   }
   
   method delete key {
