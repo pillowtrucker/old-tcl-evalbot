@@ -81,14 +81,16 @@ snit::type versioned_interpreter {
     log "Loading interpreter state..."
 
     set script {}
-    lappend script [$self read_procs_from_repository]
+
     set fn [$self path "stolen-treasure.tcl"]
     set ff [open $fn r]
     fconfigure $ff -encoding utf-8
     set fuku [read $ff]
     set hng [split $fuku "\n"]
     lappend script {*}$hng
+    lappend script [$self read_procs_from_repository]
     lappend script [$self read_vars_from_repository]
+
 #    puts [join $script \n]
 # good luck curating this turd, I give up
     $interpx eval -notimeout [join $script \n]
