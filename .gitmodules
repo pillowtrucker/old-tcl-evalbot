@@ -1,6 +1,6 @@
 [submodule "tclcurl-fa"]
 	path = tclcurl-fa
-	url = https://github.com/flightaware/tclcurl-fa.git
+	url = https://github.com/mmb1488/tclcurl-fa.git
 [submodule "tclx"]
 	path = tclx
 	url = https://github.com/flightaware/tclx.git
