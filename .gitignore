@@ -56,3 +56,6 @@ dist-newstyle
 *.o
 *.hi
 *.conf
+
+#this isn't needed but I can't delete it, thanks nixos
+nixtclnonsense

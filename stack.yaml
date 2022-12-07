@@ -28,6 +28,12 @@ resolver: lts-16.13
 #   subdirs:
 #   - auto-update
 #   - wai
+nix:
+  enable: true
+  packages:
+    - "zlib"
+    - "tcl"
+
 packages:
 - .
 # Dependency packages to be pulled from upstream that are not in the resolver.

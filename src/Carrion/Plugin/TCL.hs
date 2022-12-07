@@ -95,13 +95,13 @@ lEN_AUTO = -1
 eVAL_FLAGS_CLEAR :: Int
 eVAL_FLAGS_CLEAR = 0
 
-dumpDebug :: Monad m => p -> m ()
-dumpDebug _ = return ()
-
+--dumpDebug :: Monad m => p -> m ()
+--dumpDebug _ = return ()
+dumpDebug = putStrLn
 initPlugin :: Manhole -> IO InitStatus
 initPlugin manhole = do
   myFakeArg0 <- getExecutablePath >>= newCString
-  myTCLDl <- dlopen "/usr/lib/libtcl8.6.so" [RTLD_NOW]
+  myTCLDl <- dlopen "libtcl8.6.so" [RTLD_NOW]
   let bless name convf = dlsym myTCLDl name >>= \fp -> return $ convf $ fp
   tcl_CreateInterp <- bless "Tcl_CreateInterp" mkTcl_CreateInterp
   interp <- tcl_CreateInterp

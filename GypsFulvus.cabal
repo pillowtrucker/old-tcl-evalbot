@@ -40,7 +40,7 @@ library
                        ini
 
          extra-libraries:     tcl8.6
-         Includes:            /usr/include/tcl.h,
+         Includes:            tcl.h,
                               src/tclstubswrapper/tclstubs.h
 
          ghc-options:
@@ -81,7 +81,8 @@ executable GypsFulvus
          other-modules: GypsFulvus.PluginStuff,GypsFulvus, Carrion.Plugin.IO.STDIO, Carrion.Plugin.TCL, Carrion.Plugin.IO.IRC.Client
          exposed-modules: GypsFulvus
          extra-libraries:     tcl8.6
-         Includes:            /usr/include/tcl.h,
+--         extra-include-dirs:  /var/run/current-system/sw/include
+         Includes:            tcl.h,
                               src/tclstubswrapper/tclstubs.h
          C-Sources:           src/tclstubswrapper/tclstubs.c
          main-is:             Main.hs

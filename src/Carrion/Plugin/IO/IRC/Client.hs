@@ -227,7 +227,7 @@ initPlugin mh = do
             -- First validate with the standard function
             res <- (onServerCertificate $ clientHooks cpara) cs vc sid cc
           -- Then strip out non-issues
-            return $ filter (`notElem` [UnknownCA, SelfSigned]) res
+            return $ filter (`notElem` [UnknownCA, SelfSigned, Expired]) res
           myClientConfig = (tlsClientConfig myPort (encodeUtf8 myHost)) { tlsClientTLSSettings = TLSSettings cpara
                                                                           { clientHooks = (clientHooks cpara)
                                                                             { onServerCertificate = validate }
