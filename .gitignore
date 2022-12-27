@@ -57,5 +57,8 @@ dist-newstyle
 *.hi
 *.conf
 
+#coredumps lol
+core.*
+
 #this isn't needed but I can't delete it, thanks nixos
 nixtclnonsense

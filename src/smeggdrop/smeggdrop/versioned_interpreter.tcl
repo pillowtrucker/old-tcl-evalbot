@@ -88,6 +88,9 @@ snit::type versioned_interpreter {
     set fuku [read $ff]
     set hng [split $fuku "\n"]
     lappend script {*}$hng
+    set english_words_f [open [$self path "english_words.txt"] r]
+    set english_words [split [read $english_words_f] "\n"]
+    lappend script "set english_words [list $english_words]"
     lappend script [$self read_procs_from_repository]
     lappend script [$self read_vars_from_repository]
 
