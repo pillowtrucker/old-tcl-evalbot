@@ -41,7 +41,7 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
-  - git: git@github.com:v-e-h/plugins.git
+  - git: gitea@gitea.phosphoros.delivery:wrath/shaniqua-plugins.git
     commit: e175d3c2ea9a8cc08126d37d9e30a327d8dc8b29
   - haskeline-0.8.1.0
 
