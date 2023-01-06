@@ -1,6 +1,6 @@
 [submodule "tclcurl-fa"]
 	path = tclcurl-fa
-	url = https://github.com/mmb1488/tclcurl-fa.git
+	url = gitea@gitea.phosphoros.delivery:wrath/shaniqua-tclcurl-fa.git
 [submodule "tclx"]
 	path = tclx
 	url = https://github.com/flightaware/tclx.git
@@ -9,8 +9,5 @@
 	url = https://github.com/tcltk/tcllib.git
 [submodule "state"]
 	path = state
-	url = git@bitbucket.org:hastur666/fountain-of-wisdom.git
-[submodule "tclcurl-fa/"]
-	url = https://github.com/flightaware/tclcurl-fa.git
-[submodule "tclx/"]
-	url = https://github.com/flightaware/tclx.git
+	url = gitea@gitea.phosphoros.delivery:wrath/shaniqua-smeggdrop.git
+
