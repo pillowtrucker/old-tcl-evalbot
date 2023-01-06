@@ -42,6 +42,7 @@ packages:
 #
 extra-deps:
   - git: gitea@gitea.phosphoros.delivery:wrath/shaniqua-plugins.git
+    commit: c59e1df710eea9db5e98d3a2d989db4885bdf817
   - haskeline-0.8.1.0
 
 # - acme-missiles-0.3
