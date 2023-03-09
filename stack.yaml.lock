@@ -10,14 +10,14 @@ packages:
       sha256: 5eb50363b5f7a5539d91db5ce245adc2fd5bec634c58ad8c9498fcfd1c183d69
     name: plugins
     version: 1.6.0
-    git: git@github.com:v-e-h/plugins.git
+    git: gitea@gitea.phosphoros.delivery:wrath/shaniqua-plugins.git
     pantry-tree:
       size: 34501
       sha256: bcd754b80924fc9c852557ea2a79947eab426e7fc6ef07ae82bccac9e7c4ab91
-    commit: e175d3c2ea9a8cc08126d37d9e30a327d8dc8b29
+    commit: c59e1df710eea9db5e98d3a2d989db4885bdf817
   original:
-    git: git@github.com:v-e-h/plugins.git
-    commit: e175d3c2ea9a8cc08126d37d9e30a327d8dc8b29
+    git: gitea@gitea.phosphoros.delivery:wrath/shaniqua-plugins.git
+    commit: c59e1df710eea9db5e98d3a2d989db4885bdf817
 - completed:
     hackage: haskeline-0.8.1.0@sha256:6a6158c90b929ce7aa5331ff5e9819aa32c7df8f4a7ba324b3cc055ee96b48cb,5818
     pantry-tree:

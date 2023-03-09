@@ -159,7 +159,7 @@ processCommand wi s ip = do
         case st of
           0 -> tcl_GetStringResult interp >>= \rs -> if nullPtr == rs then dumpDebug ("Command: " ++ c ++" ; returned a null pointer result.") >> return "FAILED" else peekCString rs >>= \nrs -> dumpDebug ("Output of command: " ++ c ++ " ;" ++ nrs ++ ";") >> return nrs
           _ -> errorInfo >> tcl_GetStringResult interp >>= peekCString
-      performFromIRC = doTheTCL $ "pub:tcl:perform \"" ++ sewNick ++ "\" \"" ++ sewMask ++ "\" {} \"" ++ sewChan ++ "\" {" ++ sewCmd ++ "}"
+      performFromIRC = doTheTCL $ "pub:tcl:perform {" ++ sewNick ++ "} {" ++ sewMask ++ "} {} {" ++ sewChan ++ "} {" ++ sewCmd ++ "}"
       performAdminLevel = doTheTCL sewCmd
   res <- if (ip) then performAdminLevel else performFromIRC
   atomically $ putTMVar i interp
