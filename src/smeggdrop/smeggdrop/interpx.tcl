@@ -167,9 +167,9 @@ method {inspect proc} proc {
       if ![info exists vars_existing_before_eval($var)] {
         $self did create var $var
       } else {
-        if [info exists vars_touched_during_eval($var)] {
+#        if [info exists vars_touched_during_eval($var)] {
           $self did update var $var
-        }
+#        }
         unset vars_existing_before_eval($var)
       }
     }
