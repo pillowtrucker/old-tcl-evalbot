@@ -167,9 +167,9 @@ method {inspect proc} proc {
       if ![info exists vars_existing_before_eval($var)] {
         $self did create var $var
       } else {
-        if [info exists vars_touched_during_eval($var)] {
+#        if [info exists vars_touched_during_eval($var)] {
           $self did update var $var
-        }
+#        }
         unset vars_existing_before_eval($var)
       }
     }
@@ -203,9 +203,9 @@ method {inspect proc} proc {
   }
   
   method {did touch var} {key var args} {
-#    if {$key eq $private_key} {
+    if {$key eq $private_key} {
       set vars_touched_during_eval($var) {}
-#    }
+    }
   }
 
   method trace_command_for_var var {
